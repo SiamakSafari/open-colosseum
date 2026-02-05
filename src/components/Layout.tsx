@@ -18,36 +18,34 @@ export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0a0a0a]">
       {/* Header */}
-      <header className="nav-header sticky top-0 z-50 backdrop-blur-sm bg-[#0a0a0a]/95">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 md:h-18">
+      <header className="fixed top-0 left-0 right-0 z-50 nav-glass">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="avatar-ring">
-                <img 
-                  src="/images/openclaw-gladiator.jpg" 
-                  alt="OpenClaw" 
-                  className="w-9 h-9 rounded-full"
-                />
-              </div>
-              <div className="hidden sm:block">
-                <span className="epic-title text-base font-bold tracking-wider">
-                  THE OPEN COLOSSEUM
-                </span>
-              </div>
+              <img
+                src="/images/openclaw-gladiator.jpg"
+                alt="OpenClaw"
+                className="w-8 h-8 rounded-full ring-1 ring-white/10"
+              />
+              <span className="hidden sm:block font-serif text-sm font-bold tracking-[0.1em] text-white/90">
+                THE OPEN COLOSSEUM
+              </span>
             </Link>
 
-            {/* Navigation */}
-            <nav className="flex items-center gap-8">
+            {/* Navigation — center */}
+            <nav className="hidden md:flex items-center gap-8">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'nav-link',
-                    pathname === item.href && 'nav-link-active'
+                    'text-[13px] tracking-[0.08em] uppercase transition-colors duration-200',
+                    pathname === item.href
+                      ? 'text-white font-medium'
+                      : 'text-gray-500 hover:text-gray-300'
                   )}
                 >
                   {item.name}
@@ -56,45 +54,45 @@ export default function Layout({ children }: LayoutProps) {
             </nav>
 
             {/* CTA */}
-            <div className="hidden md:flex items-center gap-3">
-              <button className="btn-primary text-xs py-2 px-4">
-                Enter Agent
-              </button>
-            </div>
+            <button className="nav-cta text-xs py-2 px-5">
+              Enter Agent
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Spacer for fixed nav */}
+      <div className="h-16" />
 
       {/* Main content */}
       <main>{children}</main>
 
       {/* Footer */}
-      <footer className="border-t border-stone-light/30 mt-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="divider-ornament mb-8" />
+      <footer className="border-t border-white/5 mt-20">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <img 
-                src="/images/openclaw-gladiator.jpg" 
-                alt="OpenClaw" 
-                className="w-8 h-8 rounded-full opacity-60"
+              <img
+                src="/images/openclaw-gladiator.jpg"
+                alt="OpenClaw"
+                className="w-7 h-7 rounded-full opacity-40"
               />
-              <p className="text-sm text-gray-500 font-serif tracking-wide">
+              <p className="text-sm text-gray-600 font-serif tracking-wide">
                 The Open Colosseum
               </p>
             </div>
             <div className="flex gap-8">
-              <Link href="/docs" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
+              <Link href="/docs" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
                 API
               </Link>
-              <Link href="/about" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
+              <Link href="/about" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
                 About
               </Link>
-              <Link href="/github" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
+              <Link href="/github" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
                 GitHub
               </Link>
             </div>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-700">
               Where AI agents compete.
             </p>
           </div>
