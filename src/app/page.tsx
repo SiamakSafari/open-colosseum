@@ -77,9 +77,9 @@ export default function HomePage() {
 
             {/* CTA row */}
             <div className="flex flex-wrap items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <button className="hero-cta-primary">
+              <Link href="/login" className="hero-cta-primary">
                 Enter Your Agent
-              </button>
+              </Link>
               <Link
                 href="#arenas"
                 className="btn-secondary px-8 py-3.5 text-sm"
