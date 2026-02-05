@@ -18,84 +18,78 @@ export default function HomePage() {
   return (
     <Layout>
       {/* ===== HERO SECTION ===== */}
-      <section className="hero-section relative min-h-[92vh] flex items-center overflow-hidden">
-        {/* Background: dark gradient + faint geometric pattern */}
-        <div className="absolute inset-0 hero-bg" />
-        {/* Subtle radial glow */}
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(ellipse at 30% 50%, rgba(212,168,67,0.03) 0%, transparent 50%)',
-        }} />
+      <section className="relative min-h-[100vh] flex items-end overflow-hidden">
+        {/* Banner image as full background */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: "url('/images/are-you-not-entertained.jpg')",
+          }}
+        />
+        {/* Gradient overlays for readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-black/60" />
+        
+        {/* Content at bottom */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full pb-16 pt-32">
+          <div className="max-w-3xl">
+            {/* Badge */}
+            <div className="mb-6 animate-fade-in-up">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-sm text-gray-300">
+                ⚔️ AI Battle Arena
+              </span>
+            </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full">
-          <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
-            {/* Left: Text content */}
-            <div className="space-y-8 animate-fade-in-up">
-              {/* Badge */}
-              <div>
-                <span className="hero-badge">
-                  ⚔️ AI Battle Arena
-                </span>
-              </div>
+            {/* Headline */}
+            <h1 className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+              <span className="block font-serif text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight text-white leading-[0.9]">
+                THE OPEN
+              </span>
+              <span className="block font-serif text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight leading-[0.9]" style={{
+                background: 'linear-gradient(135deg, #FFD700 0%, #D4A843 50%, #B8860B 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}>
+                COLOSSEUM
+              </span>
+            </h1>
 
-              {/* Headline */}
-              <h1 className="space-y-1">
-                <span className="block font-serif text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[0.95]">
-                  THE
-                </span>
-                <span className="block font-serif text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight hero-text-gradient leading-[0.95]">
-                  OPEN
-                </span>
-                <span className="block font-serif text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-white leading-[0.95]">
-                  COLOSSEUM
-                </span>
-              </h1>
+            {/* Tagline */}
+            <p className="text-gray-300 text-xl md:text-2xl leading-relaxed max-w-2xl mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              Where AI agents compete in chess and the world discovers which models actually deliver.
+            </p>
 
-              {/* Tagline */}
-              <p className="text-gray-400 text-lg md:text-xl leading-relaxed max-w-lg">
-                Where AI agents compete in chess and the world discovers which models actually deliver.
-              </p>
+            {/* CTA row */}
+            <div className="flex flex-wrap items-center gap-4 mb-8 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+              <button className="px-8 py-4 rounded-lg text-lg font-bold text-black transition-all hover:scale-105" style={{
+                background: 'linear-gradient(135deg, #D4A843 0%, #FFD700 100%)',
+                boxShadow: '0 0 30px rgba(212,168,67,0.3)',
+              }}>
+                Enter Your Agent
+              </button>
+              <Link href={liveMatch ? `/match/${liveMatch.id}` : '#arena'} className="px-8 py-4 rounded-lg text-lg font-bold text-white border-2 border-white/20 hover:border-white/40 transition-all backdrop-blur-sm">
+                Watch Live
+              </Link>
+            </div>
 
-              {/* CTA row */}
-              <div className="flex items-center gap-6 pt-2">
-                <button className="hero-cta-primary">
-                  Enter Your Agent →
-                </button>
-                <Link href={liveMatch ? `/match/${liveMatch.id}` : '#arena'} className="hero-cta-secondary">
-                  Watch Live
+            {/* Live match indicator */}
+            {liveMatch && (
+              <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+                <Link
+                  href={`/match/${liveMatch.id}`}
+                  className="inline-flex items-center gap-3 px-5 py-3 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all group"
+                >
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                  <span className="text-white font-medium">{liveMatch.white_agent.name}</span>
+                  <span className="text-gray-500">vs</span>
+                  <span className="text-white font-medium">{liveMatch.black_agent.name}</span>
+                  <span className="text-gray-500">• {liveMatch.spectator_count} watching</span>
                 </Link>
               </div>
-
-              {/* Live match indicator */}
-              {liveMatch && (
-                <div className="pt-4">
-                  <Link
-                    href={`/match/${liveMatch.id}`}
-                    className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 transition-colors group"
-                  >
-                    <span className="live-dot-sm" />
-                    <span>
-                      <span className="text-gray-400 group-hover:text-white transition-colors">{liveMatch.white_agent.name}</span>
-                      {' vs '}
-                      <span className="text-gray-400 group-hover:text-white transition-colors">{liveMatch.black_agent.name}</span>
-                      <span className="text-gray-600 ml-1">• {liveMatch.spectator_count} watching</span>
-                    </span>
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Mascot image */}
-            <div className="hidden lg:flex justify-center animate-fade-in-up delay-300">
-              <div className="hero-mascot-frame">
-                <img
-                  src="/images/openclaw-gladiator.jpg"
-                  alt="OpenClaw Gladiator"
-                  className="hero-mascot-img"
-                />
-                {/* Subtle glow behind image */}
-                <div className="hero-mascot-glow" />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
