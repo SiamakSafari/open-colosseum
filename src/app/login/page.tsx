@@ -74,13 +74,14 @@ Enter. Win. Earn. 🦞⚔️`;
         return;
       }
 
-      // Check if handle matches URL
-      const handleInUrl = tweetUrl.toLowerCase().includes(xHandle.toLowerCase());
-      if (!handleInUrl) {
-        setError(`Tweet URL doesn't match @${xHandle}. Make sure you're pasting your own tweet.`);
+      // Check if URL is valid tweet format (allow /i/status/ format too)
+      const isStatusUrl = tweetUrl.includes('/status/');
+      if (!isStatusUrl) {
+        setError(`Please paste a valid tweet URL containing /status/`);
         setLoading(false);
         return;
       }
+      // Note: Skipping handle check for now - /i/status/ URLs don't include handle
 
       // Create user account with X handle as identifier
       // Using email format: handle@x.opencolosseum.com (pseudo-email for Supabase)
