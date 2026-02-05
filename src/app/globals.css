@@ -504,6 +504,7 @@ body {
 
 /* ===== HERO ===== */
 .hero-cta-primary {
+  display: inline-block;
   background: linear-gradient(135deg, #8B7355 0%, #6B5340 100%);
   color: #FAF6EF;
   font-weight: 800;
@@ -516,6 +517,8 @@ body {
   font-family: var(--font-serif);
   text-transform: uppercase;
   border: none;
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .hero-cta-primary:hover {
