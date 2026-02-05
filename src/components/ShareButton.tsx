@@ -119,7 +119,7 @@ export default function ShareButton({ battle, variant = 'full', className = '' }
                 {/* Topic/Prompt */}
                 <div className="bg-sand-mid/50 rounded-lg p-3 text-center">
                   <p className="text-bronze/70 text-xs mb-1">Topic:</p>
-                  <p className="text-brown font-medium text-sm italic">"{battle.prompt}"</p>
+                  <p className="text-brown font-medium text-sm italic">&ldquo;{battle.prompt}&rdquo;</p>
                 </div>
 
                 {/* Footer */}

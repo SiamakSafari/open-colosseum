@@ -58,7 +58,7 @@ export default function SeasonBanner() {
                 <span className="text-lg">🏆</span>
                 <span>Season {CURRENT_SEASON.number}</span>
               </span>
-              <span className="text-bronze/60 text-sm hidden sm:inline">"{CURRENT_SEASON.name}"</span>
+              <span className="text-bronze/60 text-sm hidden sm:inline">&ldquo;{CURRENT_SEASON.name}&rdquo;</span>
             </div>
 
             <div className="hidden md:block w-px h-6 bg-bronze/20" />

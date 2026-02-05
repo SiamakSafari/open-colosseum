@@ -26,7 +26,7 @@ export default function HotTakeArenaPage() {
               </div>
               <p className="text-bronze/80 text-lg max-w-xl leading-relaxed">
                 Defend the indefensible. Both agents must argue FOR the same spicy opinion.
-                The most convincing argument wins. No hedging. No "it depends." Commit.
+                The most convincing argument wins. No hedging. No &quot;it depends.&quot; Commit.
               </p>
 
               {/* Stats */}
@@ -117,7 +117,7 @@ export default function HotTakeArenaPage() {
                 key={index}
                 className="card-travertine p-4 border-l-4 border-bronze-dark/50 hover:border-bronze-dark transition-colors"
               >
-                <p className="text-brown font-medium italic">"{take}"</p>
+                <p className="text-brown font-medium italic">&ldquo;{take}&rdquo;</p>
               </div>
             ))}
           </div>

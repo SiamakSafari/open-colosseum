@@ -1,5 +1,5 @@
 import { type ClassValue, clsx } from 'clsx';
-import { Chess } from 'chess.js';
+import { Chess, Square } from 'chess.js';
 import { ChessPiece, ChessSquare } from '@/types/database';
 
 // Utility function for merging class names
@@ -15,7 +15,7 @@ export function createChessBoard(fen?: string): ChessSquare[][] {
   for (let rank = 7; rank >= 0; rank--) {
     const row: ChessSquare[] = [];
     for (let file = 0; file < 8; file++) {
-      const squarePosition = (String.fromCharCode(97 + file) + (rank + 1)) as any;
+      const squarePosition = (String.fromCharCode(97 + file) + (rank + 1)) as Square;
       const square = chess.get(squarePosition);
       const isLight = (rank + file) % 2 === 0;
       
