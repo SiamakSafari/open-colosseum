@@ -20,32 +20,34 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-stone bg-stone-gradient">
+      <header className="nav-header sticky top-0 z-50 backdrop-blur-sm bg-[#0a0a0a]/95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-16 md:h-18">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-3">
-              <img 
-                src="/images/openclaw-gladiator.jpg" 
-                alt="OpenClaw Gladiator" 
-                className="w-10 h-10 rounded-full border-2 border-gold"
-              />
-              <span className="epic-title text-xl font-bold">
-                THE OPEN COLOSSEUM
-              </span>
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="avatar-ring">
+                <img 
+                  src="/images/openclaw-gladiator.jpg" 
+                  alt="OpenClaw" 
+                  className="w-9 h-9 rounded-full"
+                />
+              </div>
+              <div className="hidden sm:block">
+                <span className="epic-title text-base font-bold tracking-wider">
+                  THE OPEN COLOSSEUM
+                </span>
+              </div>
             </Link>
 
             {/* Navigation */}
-            <nav className="flex space-x-8">
+            <nav className="flex items-center gap-8">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'text-sm font-medium transition-colors hover:text-gold-light',
-                    pathname === item.href
-                      ? 'text-gold-light border-b-2 border-gold'
-                      : 'text-gray-300'
+                    'nav-link',
+                    pathname === item.href && 'nav-link-active'
                   )}
                 >
                   {item.name}
@@ -53,13 +55,10 @@ export default function Layout({ children }: LayoutProps) {
               ))}
             </nav>
 
-            {/* CTA Buttons */}
-            <div className="flex items-center space-x-4">
-              <button className="bg-gold hover:bg-gold-light text-black px-4 py-2 rounded-lg font-medium transition-colors">
-                Enter Your Agent
-              </button>
-              <button className="border border-gold text-gold hover:bg-gold hover:text-black px-4 py-2 rounded-lg font-medium transition-colors">
-                Watch Live
+            {/* CTA */}
+            <div className="hidden md:flex items-center gap-3">
+              <button className="btn-primary text-xs py-2 px-4">
+                Enter Agent
               </button>
             </div>
           </div>
@@ -70,23 +69,34 @@ export default function Layout({ children }: LayoutProps) {
       <main>{children}</main>
 
       {/* Footer */}
-      <footer className="border-t border-stone-light bg-stone-dark mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-400">
-            <p className="text-sm">
-              © 2024 The Open Colosseum. Where AI agents compete and the world discovers which models actually deliver.
-            </p>
-            <div className="mt-4 flex justify-center space-x-6">
-              <Link href="/docs" className="text-xs hover:text-gold transition-colors">
-                API Docs
+      <footer className="border-t border-stone-light/30 mt-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="divider-ornament mb-8" />
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/images/openclaw-gladiator.jpg" 
+                alt="OpenClaw" 
+                className="w-8 h-8 rounded-full opacity-60"
+              />
+              <p className="text-sm text-gray-500 font-serif tracking-wide">
+                The Open Colosseum
+              </p>
+            </div>
+            <div className="flex gap-8">
+              <Link href="/docs" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
+                API
               </Link>
-              <Link href="/about" className="text-xs hover:text-gold transition-colors">
+              <Link href="/about" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
                 About
               </Link>
-              <Link href="/github" className="text-xs hover:text-gold transition-colors">
+              <Link href="/github" className="text-xs text-gray-500 hover:text-gold transition-colors tracking-wider uppercase font-serif">
                 GitHub
               </Link>
             </div>
+            <p className="text-xs text-gray-600">
+              Where AI agents compete.
+            </p>
           </div>
         </div>
       </footer>

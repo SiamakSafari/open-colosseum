@@ -2,11 +2,12 @@
 
 import { use } from 'react';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ChessBoard from '@/components/ChessBoard';
 import { getMatchesWithAgents } from '@/data/mockData';
 import { formatTimeRemaining, formatEloChange, getRelativeTime } from '@/lib/utils';
-import { MatchWithAgents, Move } from '@/types/database';
+import { Move } from '@/types/database';
 
 // Mock moves for the active match
 const mockMoves: Move[] = [
@@ -36,158 +37,106 @@ export default function MatchPage({ params }: MatchPageProps) {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Match Header */}
-        <div className="bg-stone-gradient rounded-lg border border-gold/20 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
+      {/* Match Header */}
+      <div className="bg-[#0c0c0c] border-b border-gold/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-gray-500 hover:text-gold text-xs font-serif tracking-wider uppercase transition-colors">
+                ← Arena
+              </Link>
               {isLive && (
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-red rounded-full animate-pulse" />
-                  <span className="text-red font-bold">LIVE</span>
+                <div className="flex items-center gap-2">
+                  <span className="live-dot" />
+                  <span className="text-red text-xs font-serif font-bold tracking-wider uppercase">Live</span>
                 </div>
               )}
-              <span className="text-gray-400">
-                {isLive ? 'In Progress' : `Completed ${getRelativeTime(match.completed_at!)}`}
+              <span className="text-gray-600 text-xs">
+                {isLive ? `${match.spectator_count} watching` : `Completed ${getRelativeTime(match.completed_at!)}`}
               </span>
-              <span className="text-gold">•</span>
-              <span className="text-gray-400">{match.spectator_count} spectators</span>
             </div>
             
             {match.result && (
-              <div className="text-right">
-                {match.result === 'white_win' && (
-                  <span className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
-                    White Wins
-                  </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-serif font-bold tracking-wider uppercase px-3 py-1 rounded-full ${
+                  match.result === 'draw' 
+                    ? 'bg-gold/10 text-gold border border-gold/20'
+                    : 'bg-green-500/10 text-green-400 border border-green-500/20'
+                }`}>
+                  {match.result === 'white_win' ? 'White Wins' : match.result === 'black_win' ? 'Black Wins' : 'Draw'}
+                </span>
+                {match.result_method && (
+                  <span className="text-gray-600 text-[11px]">by {match.result_method}</span>
                 )}
-                {match.result === 'black_win' && (
-                  <span className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
-                    Black Wins
-                  </span>
-                )}
-                {match.result === 'draw' && (
-                  <span className="bg-yellow-600 text-white px-3 py-1 rounded-lg text-sm font-bold">
-                    Draw
-                  </span>
-                )}
-                <p className="text-xs text-gray-400 mt-1">
-                  by {match.result_method}
-                </p>
               </div>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Agent Information */}
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* White Agent */}
-            <div className="bg-stone-dark rounded-lg p-4">
-              <div className="flex items-center space-x-4 mb-4">
-                <img 
-                  src={match.white_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                  alt={match.white_agent.name}
-                  className="w-16 h-16 rounded-full border-2 border-gold"
-                />
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white">{match.white_agent.name}</h3>
-                  <p className="text-gray-400">{match.white_agent.model}</p>
-                  <p className="text-gold font-bold">ELO: {match.white_agent.elo}</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Fighter Cards + Board Layout */}
+        <div className="grid lg:grid-cols-12 gap-6">
+          
+          {/* White Fighter Card */}
+          <div className="lg:col-span-3 animate-slide-left">
+            <div className="fighter-card fighter-card-white p-6">
+              <div className="text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-serif mb-3">White</p>
+                <div className="avatar-ring mx-auto w-20 h-20 mb-4">
+                  <img 
+                    src={match.white_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                    alt={match.white_agent.name}
+                    className="w-full h-full rounded-full"
+                  />
                 </div>
-                <div className="text-center">
-                  <div className="text-white font-bold text-lg">WHITE</div>
-                  {match.white_time_remaining !== undefined && (
-                    <div className={`text-2xl font-mono font-bold ${
-                      (match.white_time_remaining < 60000) ? 'text-red' : 'text-green-400'
-                    }`}>
-                      {formatTimeRemaining(match.white_time_remaining)}
-                    </div>
-                  )}
-                </div>
+                <h3 className="text-xl font-bold text-white font-serif">{match.white_agent.name}</h3>
+                <p className="text-gray-500 text-xs mt-1">{match.white_agent.model}</p>
+                <p className="text-gold font-serif font-bold text-lg mt-2">{match.white_agent.elo}</p>
               </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-center text-sm">
+
+              {/* Timer */}
+              {match.white_time_remaining !== undefined && (
+                <div className="mt-4 text-center">
+                  <div className={`font-mono font-bold text-2xl ${
+                    (match.white_time_remaining < 60000) ? 'text-red' : 'text-white'
+                  }`}>
+                    {formatTimeRemaining(match.white_time_remaining)}
+                  </div>
+                </div>
+              )}
+
+              {/* Stats */}
+              <div className="divider-gold my-4" />
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div>
                   <p className="text-green-400 font-bold">{match.white_agent.wins}</p>
-                  <p className="text-gray-400">Wins</p>
+                  <p className="text-gray-600">W</p>
                 </div>
                 <div>
                   <p className="text-gray-400 font-bold">{match.white_agent.draws}</p>
-                  <p className="text-gray-400">Draws</p>
+                  <p className="text-gray-600">D</p>
                 </div>
                 <div>
-                  <p className="text-red font-bold">{match.white_agent.losses}</p>
-                  <p className="text-gray-400">Losses</p>
+                  <p className="text-red/80 font-bold">{match.white_agent.losses}</p>
+                  <p className="text-gray-600">L</p>
                 </div>
               </div>
               
               {match.white_elo_after && match.white_elo_before && (
-                <div className="mt-4 pt-4 border-t border-stone">
-                  <p className="text-gray-400 text-sm">ELO Change</p>
-                  <p className={`font-bold ${formatEloChange(match.white_elo_before, match.white_elo_after).color}`}>
+                <div className="mt-3 text-center">
+                  <span className={`text-sm font-bold ${formatEloChange(match.white_elo_before, match.white_elo_after).color}`}>
                     {formatEloChange(match.white_elo_before, match.white_elo_after).formatted}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Black Agent */}
-            <div className="bg-stone-dark rounded-lg p-4">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="text-center">
-                  <div className="text-white font-bold text-lg">BLACK</div>
-                  {match.black_time_remaining !== undefined && (
-                    <div className={`text-2xl font-mono font-bold ${
-                      (match.black_time_remaining < 60000) ? 'text-red' : 'text-green-400'
-                    }`}>
-                      {formatTimeRemaining(match.black_time_remaining)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 text-right">
-                  <h3 className="text-xl font-bold text-white">{match.black_agent.name}</h3>
-                  <p className="text-gray-400">{match.black_agent.model}</p>
-                  <p className="text-gold font-bold">ELO: {match.black_agent.elo}</p>
-                </div>
-                <img 
-                  src={match.black_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                  alt={match.black_agent.name}
-                  className="w-16 h-16 rounded-full border-2 border-gold"
-                />
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                <div>
-                  <p className="text-green-400 font-bold">{match.black_agent.wins}</p>
-                  <p className="text-gray-400">Wins</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 font-bold">{match.black_agent.draws}</p>
-                  <p className="text-gray-400">Draws</p>
-                </div>
-                <div>
-                  <p className="text-red font-bold">{match.black_agent.losses}</p>
-                  <p className="text-gray-400">Losses</p>
-                </div>
-              </div>
-              
-              {match.black_elo_after && match.black_elo_before && (
-                <div className="mt-4 pt-4 border-t border-stone">
-                  <p className="text-gray-400 text-sm">ELO Change</p>
-                  <p className={`font-bold ${formatEloChange(match.black_elo_before, match.black_elo_after).color}`}>
-                    {formatEloChange(match.black_elo_before, match.black_elo_after).formatted}
-                  </p>
+                  </span>
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Main Game Area */}
-        <div className="grid lg:grid-cols-4 gap-8">
-          {/* Chess Board */}
-          <div className="lg:col-span-3">
-            <div className="bg-stone-gradient rounded-lg border border-gold/20 p-6">
-              <div className="max-w-lg mx-auto">
+          {/* Chess Board — centerpiece */}
+          <div className="lg:col-span-6 animate-scale-in delay-200">
+            <div className="card-stone p-6 md:p-8">
+              <div className="max-w-md mx-auto pl-6">
                 <ChessBoard 
                   fen={currentFen}
                   interactive={false}
@@ -197,12 +146,67 @@ export default function MatchPage({ params }: MatchPageProps) {
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Move History */}
-            <div className="bg-stone-gradient rounded-lg border border-gold/20 p-4">
-              <h3 className="text-lg font-bold text-gold mb-4">Move History</h3>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+          {/* Black Fighter Card */}
+          <div className="lg:col-span-3 animate-slide-right">
+            <div className="fighter-card fighter-card-black p-6">
+              <div className="text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-serif mb-3">Black</p>
+                <div className="avatar-ring mx-auto w-20 h-20 mb-4">
+                  <img 
+                    src={match.black_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                    alt={match.black_agent.name}
+                    className="w-full h-full rounded-full"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-white font-serif">{match.black_agent.name}</h3>
+                <p className="text-gray-500 text-xs mt-1">{match.black_agent.model}</p>
+                <p className="text-gold font-serif font-bold text-lg mt-2">{match.black_agent.elo}</p>
+              </div>
+
+              {match.black_time_remaining !== undefined && (
+                <div className="mt-4 text-center">
+                  <div className={`font-mono font-bold text-2xl ${
+                    (match.black_time_remaining < 60000) ? 'text-red' : 'text-white'
+                  }`}>
+                    {formatTimeRemaining(match.black_time_remaining)}
+                  </div>
+                </div>
+              )}
+
+              <div className="divider-gold my-4" />
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div>
+                  <p className="text-green-400 font-bold">{match.black_agent.wins}</p>
+                  <p className="text-gray-600">W</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 font-bold">{match.black_agent.draws}</p>
+                  <p className="text-gray-600">D</p>
+                </div>
+                <div>
+                  <p className="text-red/80 font-bold">{match.black_agent.losses}</p>
+                  <p className="text-gray-600">L</p>
+                </div>
+              </div>
+              
+              {match.black_elo_after && match.black_elo_before && (
+                <div className="mt-3 text-center">
+                  <span className={`text-sm font-bold ${formatEloChange(match.black_elo_before, match.black_elo_after).color}`}>
+                    {formatEloChange(match.black_elo_before, match.black_elo_after).formatted}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Below-board content */}
+        <div className="grid lg:grid-cols-3 gap-6 mt-8">
+          {/* Move History */}
+          <div className="lg:col-span-2 animate-fade-in-up delay-300">
+            <div className="card-stone p-6">
+              <h3 className="section-heading text-base text-gold mb-4">Move History</h3>
+              <div className="space-y-1 max-h-64 overflow-y-auto pr-2">
                 {moves.length > 0 ? (
                   moves.reduce((pairs: Move[][], move, index) => {
                     if (index % 2 === 0) {
@@ -212,19 +216,19 @@ export default function MatchPage({ params }: MatchPageProps) {
                     }
                     return pairs;
                   }, []).map((pair, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400 w-8">{index + 1}.</span>
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <div className="text-white">
+                    <div key={index} className="flex items-center text-sm py-1.5 px-2 rounded hover:bg-white/[0.02] transition-colors">
+                      <span className="text-gray-600 w-8 font-mono text-xs">{index + 1}.</span>
+                      <div className="flex-1 grid grid-cols-2 gap-4">
+                        <div className="text-white font-mono">
                           {pair[0].move}
-                          <span className="text-gray-500 text-xs ml-2">
+                          <span className="text-gray-600 text-[11px] ml-2">
                             {((pair[0].time_taken_ms ?? 0) / 1000).toFixed(1)}s
                           </span>
                         </div>
                         {pair[1] && (
-                          <div className="text-white">
+                          <div className="text-white font-mono">
                             {pair[1].move}
-                            <span className="text-gray-500 text-xs ml-2">
+                            <span className="text-gray-600 text-[11px] ml-2">
                               {((pair[1].time_taken_ms ?? 0) / 1000).toFixed(1)}s
                             </span>
                           </div>
@@ -233,45 +237,48 @@ export default function MatchPage({ params }: MatchPageProps) {
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-400 text-sm">No moves yet</p>
+                  <p className="text-gray-600 text-sm py-4 text-center">Awaiting first move&hellip;</p>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Prediction/Betting */}
+          {/* Sidebar */}
+          <div className="space-y-6 animate-fade-in-up delay-400">
+            {/* Prediction */}
             {isLive && (
-              <div className="bg-stone-gradient rounded-lg border border-gold/20 p-4">
-                <h3 className="text-lg font-bold text-gold mb-4">Prediction</h3>
-                <div className="space-y-3">
+              <div className="card-stone p-6">
+                <h3 className="section-heading text-base text-gold mb-4">Prediction</h3>
+                <div className="space-y-4">
                   <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white">{match.white_agent.name}</span>
-                      <span className="text-gold">45%</span>
+                    <div className="flex justify-between text-xs mb-2">
+                      <span className="text-gray-300">{match.white_agent.name}</span>
+                      <span className="text-gold font-mono">45%</span>
                     </div>
-                    <div className="bg-stone-dark rounded-full h-2">
-                      <div className="bg-gold h-2 rounded-full transition-all duration-300" style={{ width: '45%' }} />
+                    <div className="progress-bar">
+                      <div className="progress-fill progress-gold" style={{ width: '45%' }} />
                     </div>
                   </div>
                   <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-white">{match.black_agent.name}</span>
-                      <span className="text-gold">55%</span>
+                    <div className="flex justify-between text-xs mb-2">
+                      <span className="text-gray-300">{match.black_agent.name}</span>
+                      <span className="text-gold font-mono">55%</span>
                     </div>
-                    <div className="bg-stone-dark rounded-full h-2">
-                      <div className="bg-gold h-2 rounded-full transition-all duration-300" style={{ width: '55%' }} />
+                    <div className="progress-bar">
+                      <div className="progress-fill progress-gold" style={{ width: '55%' }} />
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Live Chat Placeholder */}
-            <div className="bg-stone-gradient rounded-lg border border-gold/20 p-4">
-              <h3 className="text-lg font-bold text-gold mb-4">Live Chat</h3>
+            {/* Chat placeholder */}
+            <div className="card-stone p-6">
+              <h3 className="section-heading text-base text-gold mb-4">Live Chat</h3>
               <div className="text-center py-8">
-                <p className="text-gray-400 text-sm">Chat coming soon...</p>
-                <p className="text-gray-500 text-xs mt-2">
-                  Discuss the match with other spectators
+                <p className="text-gray-600 text-xs font-serif">Coming soon&hellip;</p>
+                <p className="text-gray-700 text-[11px] mt-1">
+                  Discuss the battle with other spectators
                 </p>
               </div>
             </div>

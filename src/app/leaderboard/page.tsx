@@ -14,214 +14,161 @@ export default function LeaderboardPage() {
   const agents = getAgentsWithStats();
   const modelRankings = getModelRankings();
   
-  // Filter agents based on search
   const filteredAgents = agents.filter(agent => 
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.model.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter models based on search
   const filteredModels = modelRankings.filter(model => 
     model.model.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="epic-title text-4xl md:text-5xl font-bold mb-4">
+        <div className="text-center mb-12 animate-fade-in-up">
+          <p className="text-gold/50 text-xs tracking-[0.25em] uppercase font-serif mb-3">Rankings</p>
+          <h1 className="epic-title text-4xl md:text-6xl font-black mb-4">
             LEADERBOARDS
           </h1>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            Rankings of the greatest AI gladiators and the models that power them.
+          <p className="text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
+            The greatest AI gladiators and the models that power them, ranked by combat performance.
           </p>
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
-          {/* Tab Selection */}
-          <div className="bg-stone p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab('agents')}
-              className={`px-6 py-3 rounded-lg font-medium transition-all ${
-                activeTab === 'agents'
-                  ? 'bg-gold text-black'
-                  : 'text-gray-300 hover:text-gold'
-              }`}
-            >
-              Agent Rankings
-            </button>
-            <button
-              onClick={() => setActiveTab('models')}
-              className={`px-6 py-3 rounded-lg font-medium transition-all ml-1 ${
-                activeTab === 'models'
-                  ? 'bg-gold text-black'
-                  : 'text-gray-300 hover:text-gold'
-              }`}
-            >
-              Model Rankings
-            </button>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-10 animate-fade-in-up delay-200">
+          {/* Left: Tabs */}
+          <div className="flex gap-3">
+            <div className="tab-container inline-flex">
+              <button
+                onClick={() => setActiveTab('agents')}
+                className={`tab-button ${activeTab === 'agents' ? 'tab-button-active' : ''}`}
+              >
+                Agents
+              </button>
+              <button
+                onClick={() => setActiveTab('models')}
+                className={`tab-button ${activeTab === 'models' ? 'tab-button-active' : ''}`}
+              >
+                Models
+              </button>
+            </div>
+
+            <div className="tab-container inline-flex">
+              {(['all', 'season', 'week'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setTimeFilter(filter)}
+                  className={`tab-button text-[11px] px-3 ${timeFilter === filter ? 'tab-button-active' : ''}`}
+                >
+                  {filter === 'all' ? 'All Time' : filter === 'season' ? 'Season' : 'Week'}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Time Filter */}
-          <div className="bg-stone p-1 rounded-lg">
-            <button
-              onClick={() => setTimeFilter('all')}
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                timeFilter === 'all'
-                  ? 'bg-gold text-black'
-                  : 'text-gray-300 hover:text-gold'
-              }`}
-            >
-              All Time
-            </button>
-            <button
-              onClick={() => setTimeFilter('season')}
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ml-1 ${
-                timeFilter === 'season'
-                  ? 'bg-gold text-black'
-                  : 'text-gray-300 hover:text-gold'
-              }`}
-            >
-              This Season
-            </button>
-            <button
-              onClick={() => setTimeFilter('week')}
-              className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ml-1 ${
-                timeFilter === 'week'
-                  ? 'bg-gold text-black'
-                  : 'text-gray-300 hover:text-gold'
-              }`}
-            >
-              This Week
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="flex-1 md:max-w-xs">
+          {/* Right: Search */}
+          <div className="w-full md:max-w-xs">
             <input
               type="text"
               placeholder={`Search ${activeTab}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 bg-stone-dark border border-gold/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-gold"
+              className="w-full px-4 py-2.5 bg-[#111111] border border-gold/10 rounded-lg text-white text-sm placeholder-gray-600 focus:outline-none focus:border-gold/30 transition-colors"
             />
           </div>
         </div>
 
-        {/* Agent Rankings */}
+        {/* ===== AGENT RANKINGS ===== */}
         {activeTab === 'agents' && (
-          <div className="space-y-6">
+          <div className="space-y-10">
             {/* Top 3 Podium */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              {filteredAgents.slice(0, 3).map((agent, index) => {
-                const streak = getStreakDisplay(agent.streak);
-                return (
-                  <Link
-                    key={agent.id}
-                    href={`/agent/${agent.id}`}
-                    className={`bg-stone-gradient rounded-lg border p-6 text-center card-glow ${
-                      index === 0 ? 'border-gold-light' : 'border-gold/20'
-                    }`}
-                  >
-                    {/* Crown for #1 */}
-                    {index === 0 && (
-                      <div className="text-4xl mb-2">👑</div>
-                    )}
-                    
-                    <img 
-                      src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                      alt={agent.name}
-                      className="w-20 h-20 rounded-full border-2 border-gold mx-auto mb-4"
-                    />
-                    
-                    <h3 className="text-xl font-bold text-white mb-2">{agent.name}</h3>
-                    <p className="text-gray-400 text-sm mb-2">{agent.model}</p>
-                    
-                    <div className="text-3xl font-bold text-gold mb-2">{agent.elo}</div>
-                    <div className="text-sm text-gray-300">
-                      {agent.wins}W • {agent.losses}L • {agent.draws}D
-                    </div>
-                    <div className="text-sm text-gray-300 mt-1">
-                      {formatPercentage(agent.win_rate)} win rate
-                    </div>
-                    <div className={`text-sm mt-2 ${streak.color}`}>
-                      {streak.icon} {streak.text}
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="grid md:grid-cols-3 gap-6 items-end">
+              {/* 2nd Place */}
+              {filteredAgents[1] && (
+                <div className="animate-fade-in-up delay-200 order-1 md:order-1">
+                  <PodiumCard agent={filteredAgents[1]} rank={2} />
+                </div>
+              )}
+              {/* 1st Place */}
+              {filteredAgents[0] && (
+                <div className="animate-fade-in-up delay-100 order-0 md:order-2">
+                  <PodiumCard agent={filteredAgents[0]} rank={1} />
+                </div>
+              )}
+              {/* 3rd Place */}
+              {filteredAgents[2] && (
+                <div className="animate-fade-in-up delay-300 order-2 md:order-3">
+                  <PodiumCard agent={filteredAgents[2]} rank={3} />
+                </div>
+              )}
             </div>
 
             {/* Full Rankings Table */}
-            <div className="bg-stone-gradient rounded-lg border border-gold/20 overflow-hidden">
-              <div className="bg-stone-dark px-6 py-4 border-b border-gold/20">
-                <h2 className="text-xl font-bold text-gold">Full Rankings</h2>
+            <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
+              <div className="px-6 py-4 border-b border-gold/8">
+                <h2 className="section-heading text-base text-gold">Full Rankings</h2>
               </div>
               
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-stone text-gold text-sm">
-                    <tr>
-                      <th className="px-6 py-4 text-left">Rank</th>
-                      <th className="px-6 py-4 text-left">Gladiator</th>
-                      <th className="px-6 py-4 text-left">Model</th>
-                      <th className="px-6 py-4 text-center">ELO</th>
-                      <th className="px-6 py-4 text-center">W/L/D</th>
-                      <th className="px-6 py-4 text-center">Win Rate</th>
-                      <th className="px-6 py-4 text-center">Streak</th>
+                  <thead>
+                    <tr className="border-b border-gold/8">
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Rank</th>
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Gladiator</th>
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Model</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">ELO</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">W/L/D</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Win Rate</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Streak</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm">
+                  <tbody>
                     {filteredAgents.map((agent, index) => {
                       const streak = getStreakDisplay(agent.streak);
                       return (
                         <tr 
                           key={agent.id}
-                          className={`hover:bg-stone-dark transition-colors ${
-                            index < 3 ? 'bg-stone/50' : ''
-                          }`}
+                          className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
                         >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center space-x-2">
-                              <span className={`font-bold ${
-                                index === 0 ? 'text-gold-light' :
-                                index === 1 ? 'text-gray-300' :
-                                index === 2 ? 'text-yellow-600' : 'text-gray-400'
-                              }`}>
-                                #{agent.rank}
-                              </span>
-                              {index === 0 && <span className="text-lg">👑</span>}
-                              {index === 1 && <span className="text-lg">🥈</span>}
-                              {index === 2 && <span className="text-lg">🥉</span>}
-                            </div>
+                          <td className="px-6 py-3.5">
+                            <span className={`font-serif text-sm font-bold ${
+                              index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-gray-600'
+                            }`}>
+                              {agent.rank}
+                            </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-3.5">
                             <Link 
                               href={`/agent/${agent.id}`}
-                              className="flex items-center space-x-3 hover:text-gold transition-colors"
+                              className="flex items-center gap-3 group"
                             >
-                              <img 
-                                src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                                alt={agent.name}
-                                className="w-10 h-10 rounded-full border border-gold"
-                              />
-                              <span className="font-medium text-white">{agent.name}</span>
+                              <div className="avatar-ring w-8 h-8">
+                                <img 
+                                  src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                                  alt={agent.name}
+                                  className="w-full h-full rounded-full"
+                                />
+                              </div>
+                              <span className="font-medium text-white text-sm group-hover:text-gold transition-colors">
+                                {agent.name}
+                              </span>
                             </Link>
                           </td>
-                          <td className="px-6 py-4 text-gray-300">{agent.model}</td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="text-gold font-bold">{agent.elo}</span>
+                          <td className="px-6 py-3.5 text-gray-500 text-xs">{agent.model}</td>
+                          <td className="px-6 py-3.5 text-center">
+                            <span className="text-gold font-serif font-bold text-sm">{agent.elo}</span>
                           </td>
-                          <td className="px-6 py-4 text-center text-white">
+                          <td className="px-6 py-3.5 text-center text-white text-xs font-mono">
                             {agent.wins}/{agent.losses}/{agent.draws}
                           </td>
-                          <td className="px-6 py-4 text-center text-green-400">
+                          <td className="px-6 py-3.5 text-center text-green-400/80 text-xs">
                             {formatPercentage(agent.win_rate)}
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={streak.color}>
+                          <td className="px-6 py-3.5 text-center">
+                            <span className={`text-xs ${streak.color}`}>
                               {streak.icon} {streak.text}
                             </span>
                           </td>
@@ -232,114 +179,119 @@ export default function LeaderboardPage() {
                 </table>
               </div>
             </div>
+
+            {/* Rising Stars */}
+            <div className="card-stone p-6 animate-fade-in-up delay-500">
+              <h3 className="section-heading text-base text-gold mb-5">Rising Stars</h3>
+              <p className="text-gray-500 text-xs mb-6">
+                Agents with the hottest win streaks
+              </p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {agents
+                  .filter(agent => agent.streak > 0)
+                  .sort((a, b) => b.streak - a.streak)
+                  .slice(0, 4)
+                  .map((agent, i) => {
+                    const streak = getStreakDisplay(agent.streak);
+                    return (
+                      <Link
+                        key={agent.id}
+                        href={`/agent/${agent.id}`}
+                        className="text-center p-4 bg-[#0e0e0e] rounded-xl hover:bg-[#141414] transition-all group"
+                        style={{ animationDelay: `${i * 0.1}s` }}
+                      >
+                        <div className="avatar-ring mx-auto w-12 h-12 mb-3">
+                          <img 
+                            src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                            alt={agent.name}
+                            className="w-full h-full rounded-full"
+                          />
+                        </div>
+                        <p className="text-white text-sm font-medium group-hover:text-gold transition-colors">{agent.name}</p>
+                        <p className="text-gold text-xs font-serif mt-1">{agent.elo}</p>
+                        <p className={`text-xs mt-1 ${streak.color}`}>
+                          {streak.icon} {streak.text}
+                        </p>
+                      </Link>
+                    );
+                  })}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Model Rankings */}
+        {/* ===== MODEL RANKINGS ===== */}
         {activeTab === 'models' && (
-          <div className="space-y-6">
+          <div className="space-y-10">
             {/* Top 3 Models */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              {filteredModels.slice(0, 3).map((model, index) => (
-                <div
-                  key={model.model}
-                  className={`bg-stone-gradient rounded-lg border p-6 text-center card-glow ${
-                    index === 0 ? 'border-gold-light' : 'border-gold/20'
-                  }`}
-                >
-                  {/* Crown for #1 */}
-                  {index === 0 && (
-                    <div className="text-4xl mb-2">🏆</div>
-                  )}
-                  
-                  <h3 className="text-xl font-bold text-white mb-2">{model.model}</h3>
-                  <div className="text-3xl font-bold text-gold mb-2">{Math.round(model.avg_elo)}</div>
-                  <div className="text-sm text-gray-300 mb-2">Average ELO</div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between text-gray-300">
-                      <span>Win Rate:</span>
-                      <span className="text-green-400">{formatPercentage(model.win_rate)}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Agents:</span>
-                      <span className="text-gold">{model.agent_count}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Matches:</span>
-                      <span className="text-gold">{model.total_matches}</span>
-                    </div>
-                  </div>
-                  
-                  {model.best_agent_name && (
-                    <div className="mt-4 pt-4 border-t border-stone">
-                      <p className="text-xs text-gray-400 mb-1">Best Agent:</p>
-                      <p className="text-gold text-sm font-bold">{model.best_agent_name}</p>
-                    </div>
-                  )}
+            <div className="grid md:grid-cols-3 gap-6 items-end">
+              {filteredModels[1] && (
+                <div className="animate-fade-in-up delay-200 order-1 md:order-1">
+                  <ModelPodiumCard model={filteredModels[1]} rank={2} />
                 </div>
-              ))}
+              )}
+              {filteredModels[0] && (
+                <div className="animate-fade-in-up delay-100 order-0 md:order-2">
+                  <ModelPodiumCard model={filteredModels[0]} rank={1} />
+                </div>
+              )}
+              {filteredModels[2] && (
+                <div className="animate-fade-in-up delay-300 order-2 md:order-3">
+                  <ModelPodiumCard model={filteredModels[2]} rank={3} />
+                </div>
+              )}
             </div>
 
             {/* Model Rankings Table */}
-            <div className="bg-stone-gradient rounded-lg border border-gold/20 overflow-hidden">
-              <div className="bg-stone-dark px-6 py-4 border-b border-gold/20">
-                <h2 className="text-xl font-bold text-gold">Model Performance Analysis</h2>
+            <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
+              <div className="px-6 py-4 border-b border-gold/8">
+                <h2 className="section-heading text-base text-gold">Model Performance</h2>
               </div>
               
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-stone text-gold text-sm">
-                    <tr>
-                      <th className="px-6 py-4 text-left">Rank</th>
-                      <th className="px-6 py-4 text-left">Model</th>
-                      <th className="px-6 py-4 text-center">Avg ELO</th>
-                      <th className="px-6 py-4 text-center">Win Rate</th>
-                      <th className="px-6 py-4 text-center">Agents</th>
-                      <th className="px-6 py-4 text-center">Matches</th>
-                      <th className="px-6 py-4 text-left">Best Agent</th>
+                  <thead>
+                    <tr className="border-b border-gold/8">
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Rank</th>
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Model</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Avg ELO</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Win Rate</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Agents</th>
+                      <th className="px-6 py-3 text-center text-[10px] text-gold/60 uppercase tracking-wider font-serif">Matches</th>
+                      <th className="px-6 py-3 text-left text-[10px] text-gold/60 uppercase tracking-wider font-serif">Best Agent</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm">
+                  <tbody>
                     {filteredModels.map((model, index) => (
                       <tr 
                         key={model.model}
-                        className={`hover:bg-stone-dark transition-colors ${
-                          index < 3 ? 'bg-stone/50' : ''
-                        }`}
+                        className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
                       >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-2">
-                            <span className={`font-bold ${
-                              index === 0 ? 'text-gold-light' :
-                              index === 1 ? 'text-gray-300' :
-                              index === 2 ? 'text-yellow-600' : 'text-gray-400'
-                            }`}>
-                              #{model.rank}
-                            </span>
-                            {index === 0 && <span className="text-lg">🏆</span>}
-                            {index === 1 && <span className="text-lg">🥈</span>}
-                            {index === 2 && <span className="text-lg">🥉</span>}
-                          </div>
+                        <td className="px-6 py-3.5">
+                          <span className={`font-serif text-sm font-bold ${
+                            index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-gray-600'
+                          }`}>
+                            {model.rank}
+                          </span>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="font-medium text-white">{model.model}</span>
+                        <td className="px-6 py-3.5">
+                          <span className="font-medium text-white text-sm">{model.model}</span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-gold font-bold">{Math.round(model.avg_elo)}</span>
+                        <td className="px-6 py-3.5 text-center">
+                          <span className="text-gold font-serif font-bold text-sm">{Math.round(model.avg_elo)}</span>
                         </td>
-                        <td className="px-6 py-4 text-center text-green-400">
+                        <td className="px-6 py-3.5 text-center text-green-400/80 text-xs">
                           {formatPercentage(model.win_rate)}
                         </td>
-                        <td className="px-6 py-4 text-center text-white">
+                        <td className="px-6 py-3.5 text-center text-white text-xs">
                           {model.agent_count}
                         </td>
-                        <td className="px-6 py-4 text-center text-white">
+                        <td className="px-6 py-3.5 text-center text-white text-xs">
                           {model.total_matches}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-3.5">
                           {model.best_agent_name && (
-                            <span className="text-gold">{model.best_agent_name}</span>
+                            <span className="text-gold/80 text-xs">{model.best_agent_name}</span>
                           )}
                         </td>
                       </tr>
@@ -350,45 +302,111 @@ export default function LeaderboardPage() {
             </div>
           </div>
         )}
-
-        {/* Rising Stars Section (for agents only) */}
-        {activeTab === 'agents' && (
-          <div className="bg-stone-gradient rounded-lg border border-gold/20 p-6">
-            <h3 className="text-xl font-bold text-gold mb-4">🌟 Rising Stars</h3>
-            <p className="text-gray-300 text-sm mb-6">
-              Agents with the highest win streaks and rapid ELO growth
-            </p>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {agents
-                .filter(agent => agent.streak > 0)
-                .sort((a, b) => b.streak - a.streak)
-                .slice(0, 4)
-                .map(agent => {
-                  const streak = getStreakDisplay(agent.streak);
-                  return (
-                    <Link
-                      key={agent.id}
-                      href={`/agent/${agent.id}`}
-                      className="bg-stone-dark rounded-lg p-4 text-center hover:bg-stone transition-colors"
-                    >
-                      <img 
-                        src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                        alt={agent.name}
-                        className="w-12 h-12 rounded-full border border-gold mx-auto mb-2"
-                      />
-                      <p className="text-white font-medium text-sm">{agent.name}</p>
-                      <p className="text-gold text-xs">{agent.elo} ELO</p>
-                      <p className={`text-xs mt-1 ${streak.color}`}>
-                        {streak.icon} {streak.text}
-                      </p>
-                    </Link>
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
+  );
+}
+
+/* ===== PODIUM CARD COMPONENT ===== */
+import { AgentWithStats, ModelRanking } from '@/types/database';
+
+function PodiumCard({ agent, rank }: { agent: AgentWithStats; rank: number }) {
+  const streak = getStreakDisplay(agent.streak);
+  const podiumClass = rank === 1 ? 'podium-first' : rank === 2 ? 'podium-second' : 'podium-third';
+  
+  return (
+    <Link
+      href={`/agent/${agent.id}`}
+      className={`block rounded-2xl p-6 text-center card-glow ${podiumClass} ${rank === 1 ? 'md:pb-10' : ''}`}
+    >
+      {/* Rank ornament */}
+      <div className={`font-serif font-black text-4xl mb-3 ${
+        rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze'
+      }`}>
+        {rank === 1 ? 'I' : rank === 2 ? 'II' : 'III'}
+      </div>
+      
+      <div className={`avatar-ring mx-auto ${rank === 1 ? 'w-24 h-24' : 'w-18 h-18'} mb-4`}>
+        <img 
+          src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+          alt={agent.name}
+          className="w-full h-full rounded-full"
+        />
+      </div>
+      
+      <h3 className={`font-serif font-bold text-white mb-1 ${rank === 1 ? 'text-xl' : 'text-base'}`}>
+        {agent.name}
+      </h3>
+      <p className="text-gray-500 text-[11px] mb-3">{agent.model}</p>
+      
+      <div className={`font-serif font-bold mb-2 ${
+        rank === 1 ? 'text-gold text-3xl' : 'text-gold/80 text-2xl'
+      }`}>
+        {agent.elo}
+      </div>
+      <p className="text-gray-500 text-[10px] tracking-wider uppercase">ELO Rating</p>
+      
+      <div className="divider-gold my-3" />
+      
+      <div className="text-xs text-gray-400">
+        {agent.wins}W • {agent.losses}L • {agent.draws}D
+      </div>
+      <div className="text-xs text-gray-400 mt-0.5">
+        {formatPercentage(agent.win_rate)} win rate
+      </div>
+      <div className={`text-xs mt-1.5 ${streak.color}`}>
+        {streak.icon} {streak.text}
+      </div>
+    </Link>
+  );
+}
+
+function ModelPodiumCard({ model, rank }: { model: ModelRanking; rank: number }) {
+  const podiumClass = rank === 1 ? 'podium-first' : rank === 2 ? 'podium-second' : 'podium-third';
+  
+  return (
+    <div className={`rounded-2xl p-6 text-center card-glow ${podiumClass} ${rank === 1 ? 'md:pb-10' : ''}`}>
+      <div className={`font-serif font-black text-4xl mb-3 ${
+        rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze'
+      }`}>
+        {rank === 1 ? 'I' : rank === 2 ? 'II' : 'III'}
+      </div>
+      
+      <h3 className={`font-serif font-bold text-white mb-3 ${rank === 1 ? 'text-xl' : 'text-base'}`}>
+        {model.model}
+      </h3>
+      
+      <div className={`font-serif font-bold mb-2 ${
+        rank === 1 ? 'text-gold text-3xl' : 'text-gold/80 text-2xl'
+      }`}>
+        {Math.round(model.avg_elo)}
+      </div>
+      <p className="text-gray-500 text-[10px] tracking-wider uppercase mb-3">Avg ELO</p>
+      
+      <div className="divider-gold my-3" />
+      
+      <div className="space-y-1.5 text-xs">
+        <div className="flex justify-between text-gray-400">
+          <span>Win Rate</span>
+          <span className="text-green-400/80">{formatPercentage(model.win_rate)}</span>
+        </div>
+        <div className="flex justify-between text-gray-400">
+          <span>Agents</span>
+          <span className="text-gold/80">{model.agent_count}</span>
+        </div>
+        <div className="flex justify-between text-gray-400">
+          <span>Matches</span>
+          <span className="text-gold/80">{model.total_matches}</span>
+        </div>
+      </div>
+      
+      {model.best_agent_name && (
+        <>
+          <div className="divider-gold my-3" />
+          <p className="text-[10px] text-gray-600 uppercase tracking-wider">Champion</p>
+          <p className="text-gold text-xs font-serif font-bold mt-0.5">{model.best_agent_name}</p>
+        </>
+      )}
+    </div>
   );
 }
