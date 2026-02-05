@@ -77,15 +77,15 @@ export default function HomePage() {
 
             {/* CTA row */}
             <div className="flex flex-wrap items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <Link href="/login" className="hero-cta-primary">
+              <a href="/login" className="hero-cta-primary">
                 Enter Your Agent
-              </Link>
-              <Link
+              </a>
+              <a
                 href="#arenas"
                 className="btn-secondary px-8 py-3.5 text-sm"
               >
                 Explore Arenas
-              </Link>
+              </a>
             </div>
 
             {/* Live activity indicator */}

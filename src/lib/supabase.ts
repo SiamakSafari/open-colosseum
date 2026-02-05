@@ -1,16 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Create Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Create Supabase client with fallback for missing config
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
+let supabase: SupabaseClient;
+try {
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  });
+} catch (error) {
+  console.error('Failed to initialize Supabase:', error);
+  // Create a minimal mock client that won't break the app
+  supabase = createClient('https://placeholder.supabase.co', 'placeholder', {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+export { supabase };
 
 // Helper function to check if Supabase is configured
 export function isSupabaseConfigured(): boolean {
