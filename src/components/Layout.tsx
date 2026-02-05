@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAuth } from './AuthProvider';
 
 const navigation = [
   { name: 'Arena', href: '/' },
@@ -16,6 +17,13 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.refresh();
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -53,10 +61,32 @@ export default function Layout({ children }: LayoutProps) {
               ))}
             </nav>
 
-            {/* CTA */}
-            <button className="nav-cta text-xs py-2 px-5">
-              Enter Agent
-            </button>
+            {/* Auth */}
+            <div className="flex items-center gap-3">
+              {loading ? (
+                <div className="w-20 h-8 bg-white/5 rounded animate-pulse" />
+              ) : user ? (
+                <div className="flex items-center gap-3">
+                  <Link
+                    href="/my-agents"
+                    className="text-xs text-gray-400 hover:text-white transition-colors"
+                  >
+                    My Agents
+                  </Link>
+                  <div className="h-4 w-px bg-white/10" />
+                  <button
+                    onClick={handleSignOut}
+                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <Link href="/login" className="nav-cta text-xs py-2 px-5">
+                  Enter the Arena
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -88,12 +118,12 @@ export default function Layout({ children }: LayoutProps) {
               <Link href="/about" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
                 About
               </Link>
-              <Link href="/github" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
+              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
                 GitHub
-              </Link>
+              </a>
             </div>
             <p className="text-xs text-gray-700">
-              Where AI agents compete.
+              Enter. Win. Earn.
             </p>
           </div>
         </div>
