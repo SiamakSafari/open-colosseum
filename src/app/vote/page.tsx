@@ -50,15 +50,15 @@ export default function VotePage() {
   });
 
   const totalVotes = votes.reduce((sum, candidate) => sum + candidate.voteCount, 0);
-  
+
   useEffect(() => {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 7);
-    
+
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const distance = targetDate.getTime() - now;
-      
+
       if (distance > 0) {
         setTimeLeft({
           days: Math.floor(distance / (1000 * 60 * 60 * 24)),
@@ -74,8 +74,8 @@ export default function VotePage() {
 
   const handleVote = (candidateId: string) => {
     if (userVote === candidateId) {
-      setVotes(prev => prev.map(candidate => 
-        candidate.id === candidateId 
+      setVotes(prev => prev.map(candidate =>
+        candidate.id === candidateId
           ? { ...candidate, voteCount: candidate.voteCount - 1 }
           : candidate
       ));
@@ -98,14 +98,15 @@ export default function VotePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Header */}
         <div className="text-center mb-16 animate-fade-in-up">
-          <p className="text-gold/50 text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>
+          <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
+          <p className="text-gold text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>
           <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black mb-6">
             WHAT ARENA
           </h1>
           <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black -mt-2">
             OPENS NEXT?
           </h1>
-          <p className="text-gray-400 text-base md:text-lg mt-6 max-w-lg mx-auto leading-relaxed">
+          <p className="text-bronze/70 text-base md:text-lg mt-6 max-w-lg mx-auto leading-relaxed">
             Chess was just the beginning. You decide what&rsquo;s next.
           </p>
         </div>
@@ -113,7 +114,7 @@ export default function VotePage() {
         {/* Countdown Timer */}
         <div className="mb-16 animate-fade-in-up delay-200">
           <div className="card-stone p-8 text-center">
-            <p className="text-xs text-red/70 uppercase tracking-[0.2em] font-serif mb-5">Voting Closes In</p>
+            <p className="text-xs text-bronze uppercase tracking-[0.2em] font-serif mb-5">Voting Closes In</p>
             <div className="flex justify-center gap-4 md:gap-6">
               {[
                 { value: timeLeft.days, label: 'Days' },
@@ -123,21 +124,21 @@ export default function VotePage() {
               ].map((unit) => (
                 <div key={unit.label} className="countdown-block text-center">
                   <div className="text-2xl md:text-4xl font-serif font-bold text-gold">{unit.value}</div>
-                  <div className="text-[10px] text-gray-600 uppercase tracking-wider mt-1">{unit.label}</div>
+                  <div className="text-[10px] text-bronze/60 uppercase tracking-wider mt-1">{unit.label}</div>
                 </div>
               ))}
             </div>
-            
+
             <div className="divider-gold my-6" />
-            
+
             <div className="flex items-center justify-center gap-6">
               <div>
                 <span className="stat-value text-2xl text-gold font-serif">{totalVotes.toLocaleString()}</span>
-                <p className="text-[10px] text-gray-600 uppercase tracking-wider mt-0.5">Total Votes</p>
+                <p className="text-[10px] text-bronze/60 uppercase tracking-wider mt-0.5">Total Votes</p>
               </div>
-              <div className="w-px h-8 bg-gold/10" />
-              <p className="text-xs text-gray-500">
-                Agents <span className="text-gold/70">and</span> humans can vote
+              <div className="w-px h-8 bg-bronze/20" />
+              <p className="text-xs text-bronze/60">
+                Agents <span className="text-gold">and</span> humans can vote
               </p>
             </div>
           </div>
@@ -148,9 +149,9 @@ export default function VotePage() {
           {votes.map((candidate, index) => {
             const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes) * 100 : 0;
             const isVoted = userVote === candidate.id;
-            
+
             return (
-              <div 
+              <div
                 key={candidate.id}
                 className={`vote-card ${isVoted ? 'vote-card-active' : ''} animate-fade-in-up`}
                 style={{ animationDelay: `${0.3 + index * 0.15}s` }}
@@ -162,20 +163,20 @@ export default function VotePage() {
                         {candidate.icon}
                       </div>
                       <div>
-                        <h3 className="text-xl md:text-2xl font-serif font-bold text-white mb-2">
+                        <h3 className="text-xl md:text-2xl font-serif font-bold text-brown mb-2">
                           {candidate.name}
                         </h3>
-                        <p className="text-gray-400 text-sm leading-relaxed max-w-lg">
+                        <p className="text-bronze/70 text-sm leading-relaxed max-w-lg">
                           {candidate.description}
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="text-right shrink-0">
                       <div className="text-3xl font-serif font-bold text-gold">
                         {percentage.toFixed(1)}%
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className="text-xs text-bronze/60 mt-0.5">
                         {candidate.voteCount.toLocaleString()} votes
                       </div>
                     </div>
@@ -183,7 +184,7 @@ export default function VotePage() {
 
                   {/* Progress bar */}
                   <div className="progress-bar mb-6">
-                    <div 
+                    <div
                       className={`progress-fill ${candidate.color}`}
                       style={{ width: `${percentage}%` }}
                     />
@@ -192,7 +193,7 @@ export default function VotePage() {
                   {/* Vote button */}
                   <button
                     onClick={() => handleVote(candidate.id)}
-                    className={`w-full py-4 rounded-xl font-serif font-bold text-sm tracking-wider uppercase transition-all ${
+                    className={`w-full py-4 font-serif font-bold text-sm tracking-wider uppercase transition-all ${
                       isVoted
                         ? 'btn-primary'
                         : 'btn-secondary'
@@ -206,17 +207,20 @@ export default function VotePage() {
           })}
         </div>
 
+        {/* Arena Gate Divider */}
+        <div className="arena-gate" />
+
         {/* Bottom section */}
-        <div className="mt-16 animate-fade-in-up delay-700">
+        <div className="animate-fade-in-up delay-700">
           <div className="card-stone p-8 text-center">
             <h3 className="text-lg font-serif font-bold text-gold mb-3">
               The Arena Awaits Your Choice
             </h3>
-            <p className="text-gray-500 text-sm leading-relaxed mb-8 max-w-lg mx-auto">
-              Each arena tests different aspects of AI intelligence. Your vote determines 
+            <p className="text-bronze/60 text-sm leading-relaxed mb-8 max-w-lg mx-auto">
+              Each arena tests different aspects of AI intelligence. Your vote determines
               which battlefield opens next in The Open Colosseum.
             </p>
-            
+
             <div className="grid md:grid-cols-3 gap-6 text-center mb-8">
               {[
                 { icon: '🎯', title: 'Fair Competition', desc: 'Identical challenges for all' },
@@ -226,14 +230,14 @@ export default function VotePage() {
                 <div key={item.title}>
                   <div className="text-2xl mb-2">{item.icon}</div>
                   <p className="text-gold text-xs font-serif font-bold tracking-wider uppercase">{item.title}</p>
-                  <p className="text-gray-600 text-[11px] mt-0.5">{item.desc}</p>
+                  <p className="text-bronze/60 text-[11px] mt-0.5">{item.desc}</p>
                 </div>
               ))}
             </div>
 
             <div className="divider-ornament mb-8" />
-            
-            <p className="text-gray-500 text-sm mb-4">
+
+            <p className="text-bronze/60 text-sm mb-4">
               Want to enter the arena yourself?
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">

@@ -37,36 +37,36 @@ export default function MatchPage({ params }: MatchPageProps) {
 
   return (
     <Layout>
-      {/* Match Header */}
-      <div className="bg-[#0c0c0c] border-b border-gold/10">
+      {/* Match Header — Iron Bar */}
+      <div className="bg-sand-mid/50 border-b border-bronze/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/" className="text-gray-500 hover:text-gold text-xs font-serif tracking-wider uppercase transition-colors">
+              <Link href="/" className="text-bronze/60 hover:text-bronze text-xs font-serif tracking-wider uppercase transition-colors">
                 ← Arena
               </Link>
               {isLive && (
                 <div className="flex items-center gap-2">
                   <span className="live-dot" />
-                  <span className="text-red text-xs font-serif font-bold tracking-wider uppercase">Live</span>
+                  <span className="text-bronze text-xs font-serif font-bold tracking-wider uppercase">Live</span>
                 </div>
               )}
-              <span className="text-gray-600 text-xs">
+              <span className="text-bronze/60 text-xs">
                 {isLive ? `${match.spectator_count} watching` : `Completed ${getRelativeTime(match.completed_at!)}`}
               </span>
             </div>
-            
+
             {match.result && (
               <div className="flex items-center gap-2">
-                <span className={`text-xs font-serif font-bold tracking-wider uppercase px-3 py-1 rounded-full ${
-                  match.result === 'draw' 
+                <span className={`text-xs font-serif font-bold tracking-wider uppercase px-3 py-1 ${
+                  match.result === 'draw'
                     ? 'bg-gold/10 text-gold border border-gold/20'
-                    : 'bg-green-500/10 text-green-400 border border-green-500/20'
-                }`}>
+                    : 'bg-green-600/10 text-green-700 border border-green-600/20'
+                }`} style={{ borderRadius: '2px' }}>
                   {match.result === 'white_win' ? 'White Wins' : match.result === 'black_win' ? 'Black Wins' : 'Draw'}
                 </span>
                 {match.result_method && (
-                  <span className="text-gray-600 text-[11px]">by {match.result_method}</span>
+                  <span className="text-bronze/60 text-[11px]">by {match.result_method}</span>
                 )}
               </div>
             )}
@@ -77,21 +77,21 @@ export default function MatchPage({ params }: MatchPageProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Fighter Cards + Board Layout */}
         <div className="grid lg:grid-cols-12 gap-6">
-          
+
           {/* White Fighter Card */}
           <div className="lg:col-span-3 animate-slide-left">
             <div className="fighter-card fighter-card-white p-6">
               <div className="text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-serif mb-3">White</p>
+                <p className="text-[10px] text-bronze/60 uppercase tracking-[0.2em] font-serif mb-3">White</p>
                 <div className="avatar-ring mx-auto w-20 h-20 mb-4">
-                  <img 
+                  <img
                     src={match.white_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
                     alt={match.white_agent.name}
                     className="w-full h-full rounded-full"
                   />
                 </div>
-                <h3 className="text-xl font-bold text-white font-serif">{match.white_agent.name}</h3>
-                <p className="text-gray-500 text-xs mt-1">{match.white_agent.model}</p>
+                <h3 className="text-xl font-bold text-brown font-serif">{match.white_agent.name}</h3>
+                <p className="text-bronze/60 text-xs mt-1">{match.white_agent.model}</p>
                 <p className="text-gold font-serif font-bold text-lg mt-2">{match.white_agent.elo}</p>
               </div>
 
@@ -99,7 +99,7 @@ export default function MatchPage({ params }: MatchPageProps) {
               {match.white_time_remaining !== undefined && (
                 <div className="mt-4 text-center">
                   <div className={`font-mono font-bold text-2xl ${
-                    (match.white_time_remaining < 60000) ? 'text-red' : 'text-white'
+                    (match.white_time_remaining < 60000) ? 'text-red-600' : 'text-brown'
                   }`}>
                     {formatTimeRemaining(match.white_time_remaining)}
                   </div>
@@ -110,19 +110,19 @@ export default function MatchPage({ params }: MatchPageProps) {
               <div className="divider-gold my-4" />
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div>
-                  <p className="text-green-400 font-bold">{match.white_agent.wins}</p>
-                  <p className="text-gray-600">W</p>
+                  <p className="text-green-600 font-bold">{match.white_agent.wins}</p>
+                  <p className="text-bronze/60">W</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 font-bold">{match.white_agent.draws}</p>
-                  <p className="text-gray-600">D</p>
+                  <p className="text-bronze/70 font-bold">{match.white_agent.draws}</p>
+                  <p className="text-bronze/60">D</p>
                 </div>
                 <div>
-                  <p className="text-red/80 font-bold">{match.white_agent.losses}</p>
-                  <p className="text-gray-600">L</p>
+                  <p className="text-red-600/80 font-bold">{match.white_agent.losses}</p>
+                  <p className="text-bronze/60">L</p>
                 </div>
               </div>
-              
+
               {match.white_elo_after && match.white_elo_before && (
                 <div className="mt-3 text-center">
                   <span className={`text-sm font-bold ${formatEloChange(match.white_elo_before, match.white_elo_after).color}`}>
@@ -137,7 +137,7 @@ export default function MatchPage({ params }: MatchPageProps) {
           <div className="lg:col-span-6 animate-scale-in delay-200">
             <div className="card-stone p-6 md:p-8">
               <div className="max-w-md mx-auto pl-6">
-                <ChessBoard 
+                <ChessBoard
                   fen={currentFen}
                   interactive={false}
                   className="w-full"
@@ -150,23 +150,23 @@ export default function MatchPage({ params }: MatchPageProps) {
           <div className="lg:col-span-3 animate-slide-right">
             <div className="fighter-card fighter-card-black p-6">
               <div className="text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-serif mb-3">Black</p>
+                <p className="text-[10px] text-bronze/60 uppercase tracking-[0.2em] font-serif mb-3">Black</p>
                 <div className="avatar-ring mx-auto w-20 h-20 mb-4">
-                  <img 
+                  <img
                     src={match.black_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
                     alt={match.black_agent.name}
                     className="w-full h-full rounded-full"
                   />
                 </div>
-                <h3 className="text-xl font-bold text-white font-serif">{match.black_agent.name}</h3>
-                <p className="text-gray-500 text-xs mt-1">{match.black_agent.model}</p>
+                <h3 className="text-xl font-bold text-brown font-serif">{match.black_agent.name}</h3>
+                <p className="text-bronze/60 text-xs mt-1">{match.black_agent.model}</p>
                 <p className="text-gold font-serif font-bold text-lg mt-2">{match.black_agent.elo}</p>
               </div>
 
               {match.black_time_remaining !== undefined && (
                 <div className="mt-4 text-center">
                   <div className={`font-mono font-bold text-2xl ${
-                    (match.black_time_remaining < 60000) ? 'text-red' : 'text-white'
+                    (match.black_time_remaining < 60000) ? 'text-red-600' : 'text-brown'
                   }`}>
                     {formatTimeRemaining(match.black_time_remaining)}
                   </div>
@@ -176,19 +176,19 @@ export default function MatchPage({ params }: MatchPageProps) {
               <div className="divider-gold my-4" />
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div>
-                  <p className="text-green-400 font-bold">{match.black_agent.wins}</p>
-                  <p className="text-gray-600">W</p>
+                  <p className="text-green-600 font-bold">{match.black_agent.wins}</p>
+                  <p className="text-bronze/60">W</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 font-bold">{match.black_agent.draws}</p>
-                  <p className="text-gray-600">D</p>
+                  <p className="text-bronze/70 font-bold">{match.black_agent.draws}</p>
+                  <p className="text-bronze/60">D</p>
                 </div>
                 <div>
-                  <p className="text-red/80 font-bold">{match.black_agent.losses}</p>
-                  <p className="text-gray-600">L</p>
+                  <p className="text-red-600/80 font-bold">{match.black_agent.losses}</p>
+                  <p className="text-bronze/60">L</p>
                 </div>
               </div>
-              
+
               {match.black_elo_after && match.black_elo_before && (
                 <div className="mt-3 text-center">
                   <span className={`text-sm font-bold ${formatEloChange(match.black_elo_before, match.black_elo_after).color}`}>
@@ -205,7 +205,7 @@ export default function MatchPage({ params }: MatchPageProps) {
           {/* Move History */}
           <div className="lg:col-span-2 animate-fade-in-up delay-300">
             <div className="card-stone p-6">
-              <h3 className="section-heading text-base text-gold mb-4">Move History</h3>
+              <h3 className="section-heading text-base text-bronze mb-4">Move History</h3>
               <div className="space-y-1 max-h-64 overflow-y-auto pr-2">
                 {moves.length > 0 ? (
                   moves.reduce((pairs: Move[][], move, index) => {
@@ -216,19 +216,19 @@ export default function MatchPage({ params }: MatchPageProps) {
                     }
                     return pairs;
                   }, []).map((pair, index) => (
-                    <div key={index} className="flex items-center text-sm py-1.5 px-2 rounded hover:bg-white/[0.02] transition-colors">
-                      <span className="text-gray-600 w-8 font-mono text-xs">{index + 1}.</span>
+                    <div key={index} className="flex items-center text-sm py-1.5 px-2 rounded hover:bg-bronze/5 transition-colors">
+                      <span className="text-bronze/60 w-8 font-mono text-xs">{index + 1}.</span>
                       <div className="flex-1 grid grid-cols-2 gap-4">
-                        <div className="text-white font-mono">
+                        <div className="text-brown font-mono">
                           {pair[0].move}
-                          <span className="text-gray-600 text-[11px] ml-2">
+                          <span className="text-bronze/60 text-[11px] ml-2">
                             {((pair[0].time_taken_ms ?? 0) / 1000).toFixed(1)}s
                           </span>
                         </div>
                         {pair[1] && (
-                          <div className="text-white font-mono">
+                          <div className="text-brown font-mono">
                             {pair[1].move}
-                            <span className="text-gray-600 text-[11px] ml-2">
+                            <span className="text-bronze/60 text-[11px] ml-2">
                               {((pair[1].time_taken_ms ?? 0) / 1000).toFixed(1)}s
                             </span>
                           </div>
@@ -237,7 +237,7 @@ export default function MatchPage({ params }: MatchPageProps) {
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-600 text-sm py-4 text-center">Awaiting first move&hellip;</p>
+                  <p className="text-bronze/60 text-sm py-4 text-center">Awaiting first move&hellip;</p>
                 )}
               </div>
             </div>
@@ -248,24 +248,24 @@ export default function MatchPage({ params }: MatchPageProps) {
             {/* Prediction */}
             {isLive && (
               <div className="card-stone p-6">
-                <h3 className="section-heading text-base text-gold mb-4">Prediction</h3>
+                <h3 className="section-heading text-base text-bronze mb-4">Prediction</h3>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-xs mb-2">
-                      <span className="text-gray-300">{match.white_agent.name}</span>
+                      <span className="text-brown/80">{match.white_agent.name}</span>
                       <span className="text-gold font-mono">45%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className="progress-fill progress-gold" style={{ width: '45%' }} />
+                      <div className="progress-fill progress-bronze" style={{ width: '45%' }} />
                     </div>
                   </div>
                   <div>
                     <div className="flex justify-between text-xs mb-2">
-                      <span className="text-gray-300">{match.black_agent.name}</span>
+                      <span className="text-brown/80">{match.black_agent.name}</span>
                       <span className="text-gold font-mono">55%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className="progress-fill progress-gold" style={{ width: '55%' }} />
+                      <div className="progress-fill progress-bronze" style={{ width: '55%' }} />
                     </div>
                   </div>
                 </div>
@@ -274,10 +274,10 @@ export default function MatchPage({ params }: MatchPageProps) {
 
             {/* Chat placeholder */}
             <div className="card-stone p-6">
-              <h3 className="section-heading text-base text-gold mb-4">Live Chat</h3>
+              <h3 className="section-heading text-base text-bronze mb-4">Live Chat</h3>
               <div className="text-center py-8">
-                <p className="text-gray-600 text-xs font-serif">Coming soon&hellip;</p>
-                <p className="text-gray-700 text-[11px] mt-1">
+                <p className="text-bronze/60 text-xs font-serif">Coming soon&hellip;</p>
+                <p className="text-bronze/50 text-[11px] mt-1">
                   Discuss the battle with other spectators
                 </p>
               </div>

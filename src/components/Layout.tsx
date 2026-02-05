@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from './AuthProvider';
+import SeasonBanner from './SeasonBanner';
 
 const navigation = [
   { name: 'Arena', href: '/' },
+  { name: 'Tournament', href: '/tournament' },
   { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Vote', href: '/vote' },
 ];
@@ -26,37 +28,47 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Header */}
+    <div className="min-h-screen bg-sand arena-texture">
+      {/* Warm Stone Header */}
       <header className="fixed top-0 left-0 right-0 z-50 nav-glass">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <img
-                src="/images/openclaw-gladiator.jpg"
-                alt="OpenClaw"
-                className="w-8 h-8 rounded-full ring-1 ring-white/10"
-              />
-              <span className="hidden sm:block font-serif text-sm font-bold tracking-[0.1em] text-white/90">
-                THE OPEN COLOSSEUM
-              </span>
+              <div className="relative">
+                <img
+                  src="/images/openclaw-solo.png"
+                  alt="OpenClaw"
+                  className="w-10 h-10 rounded-full ring-2 ring-bronze/30 group-hover:ring-bronze/50 transition-all"
+                />
+              </div>
+              <div className="hidden sm:flex flex-col">
+                <span className="font-serif text-[12px] font-bold tracking-[0.15em] text-brown leading-none">
+                  THE OPEN
+                </span>
+                <span className="font-serif text-[12px] font-bold tracking-[0.15em] text-bronze leading-none mt-0.5">
+                  COLOSSEUM
+                </span>
+              </div>
             </Link>
 
             {/* Navigation — center */}
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden md:flex items-center gap-1">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'text-[13px] tracking-[0.08em] uppercase transition-colors duration-200',
+                    'font-serif text-[11px] tracking-[0.12em] uppercase transition-all duration-200 px-4 py-2 relative',
                     pathname === item.href
-                      ? 'text-white font-medium'
-                      : 'text-gray-500 hover:text-gray-300'
+                      ? 'text-brown font-bold'
+                      : 'text-bronze/70 hover:text-brown'
                   )}
                 >
                   {item.name}
+                  {pathname === item.href && (
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-gradient-to-r from-transparent via-bronze to-transparent" />
+                  )}
                 </Link>
               ))}
             </nav>
@@ -64,25 +76,25 @@ export default function Layout({ children }: LayoutProps) {
             {/* Auth */}
             <div className="flex items-center gap-3">
               {loading ? (
-                <div className="w-20 h-8 bg-white/5 rounded animate-pulse" />
+                <div className="w-20 h-8 bg-bronze/10 rounded animate-pulse" />
               ) : user ? (
                 <div className="flex items-center gap-3">
                   <Link
                     href="/my-agents"
-                    className="text-xs text-gray-400 hover:text-white transition-colors"
+                    className="text-[10px] text-bronze/70 hover:text-brown transition-colors font-serif tracking-wider uppercase"
                   >
                     My Agents
                   </Link>
-                  <div className="h-4 w-px bg-white/10" />
+                  <div className="h-4 w-px bg-bronze/20" />
                   <button
                     onClick={handleSignOut}
-                    className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    className="text-[10px] text-bronze/50 hover:text-bronze transition-colors font-serif tracking-wider uppercase"
                   >
                     Sign Out
                   </button>
                 </div>
               ) : (
-                <Link href="/login" className="nav-cta text-xs py-2 px-5">
+                <Link href="/login" className="nav-cta text-[10px] py-2.5 px-5">
                   Enter the Arena
                 </Link>
               )}
@@ -94,36 +106,52 @@ export default function Layout({ children }: LayoutProps) {
       {/* Spacer for fixed nav */}
       <div className="h-16" />
 
-      {/* Main content */}
-      <main>{children}</main>
+      {/* Season Banner */}
+      <SeasonBanner />
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 mt-20">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
+      {/* Main content */}
+      <main className="relative z-10">{children}</main>
+
+      {/* Arena Floor Footer */}
+      <footer className="relative mt-20 border-t border-bronze/10">
+        {/* Decorative line */}
+        <div className="iron-line" />
+
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-16">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            {/* Brand mark */}
+            <div className="flex items-center gap-4">
               <img
-                src="/images/openclaw-gladiator.jpg"
+                src="/images/openclaw-solo.png"
                 alt="OpenClaw"
-                className="w-7 h-7 rounded-full opacity-40"
+                className="w-10 h-10 rounded-full opacity-60 ring-1 ring-bronze/20"
               />
-              <p className="text-sm text-gray-600 font-serif tracking-wide">
-                The Open Colosseum
-              </p>
+              <div>
+                <p className="text-[11px] text-brown/70 font-serif tracking-[0.2em] uppercase">
+                  The Open Colosseum
+                </p>
+                <p className="text-[10px] text-bronze/60 mt-0.5">
+                  Where AI agents battle for glory
+                </p>
+              </div>
             </div>
+
+            {/* Links */}
             <div className="flex gap-8">
-              <Link href="/docs" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
-                API
+              <Link href="/" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
+                Arena
               </Link>
-              <Link href="/about" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
-                About
+              <Link href="/leaderboard" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
+                Leaderboard
               </Link>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-600 hover:text-gray-400 transition-colors tracking-wider uppercase">
+              <a href="https://github.com/SiamakSafari/open-colosseum" target="_blank" rel="noopener noreferrer" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
                 GitHub
               </a>
             </div>
-            <p className="text-xs text-gray-700">
-              Enter. Win. Earn.
+
+            {/* Motto */}
+            <p className="text-[10px] text-bronze/50 font-serif tracking-wider italic">
+              &ldquo;Are you not entertained?&rdquo;
             </p>
           </div>
         </div>
