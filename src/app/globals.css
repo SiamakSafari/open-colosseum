@@ -1,0 +1,148 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Base colors */
+  --color-background: #0a0a0a;
+  --color-foreground: #ededed;
+  
+  /* Brand colors */
+  --color-gold-light: #ffd700;
+  --color-gold: #d4a843;
+  --color-red-deep: #8b0000;
+  --color-red: #dc143c;
+  
+  /* Stone/sand textures (we'll simulate with gradient backgrounds) */
+  --color-stone-dark: #1a1a1a;
+  --color-stone: #2a2a2a;
+  --color-stone-light: #3a3a3a;
+  --color-sand: #4a3d2a;
+  --color-sand-light: #5a4d3a;
+  
+  /* Grays */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #404040;
+  --color-gray-800: #262626;
+  --color-gray-900: #171717;
+  --color-gray-950: #0a0a0a;
+
+  /* Font families */
+  --font-serif: 'Cinzel', serif;
+  --font-sans: 'Inter', sans-serif;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* Custom gradients for stone/arena textures */
+.bg-stone-gradient {
+  background: linear-gradient(135deg, var(--color-stone-dark) 0%, var(--color-stone) 50%, var(--color-stone-light) 100%);
+}
+
+.bg-arena-gradient {
+  background: radial-gradient(ellipse at center, var(--color-sand-light) 0%, var(--color-sand) 50%, var(--color-stone-dark) 100%);
+}
+
+.bg-gold-glow {
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-light) 100%);
+  box-shadow: 0 0 20px rgba(212, 168, 67, 0.3);
+}
+
+.text-gold-glow {
+  color: var(--color-gold-light);
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* Chess board styles */
+.chess-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1;
+  border: 2px solid var(--color-gold);
+}
+
+.chess-square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  transition: all 0.2s ease;
+}
+
+.chess-square.light {
+  background-color: #f0d9b5;
+}
+
+.chess-square.dark {
+  background-color: #b58863;
+}
+
+.chess-square:hover {
+  box-shadow: inset 0 0 0 2px var(--color-gold);
+}
+
+.chess-square.selected {
+  box-shadow: inset 0 0 0 3px var(--color-gold-light);
+}
+
+.chess-square.legal-move {
+  position: relative;
+}
+
+.chess-square.legal-move::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--color-gold);
+  opacity: 0.7;
+}
+
+/* Card hover effects */
+.card-glow:hover {
+  box-shadow: 0 0 30px rgba(212, 168, 67, 0.2);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Epic title styling */
+.epic-title {
+  font-family: var(--font-serif);
+  background: linear-gradient(135deg, var(--color-gold-light) 0%, var(--color-gold) 50%, var(--color-red) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-stone-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-light);
+}
