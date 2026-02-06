@@ -99,14 +99,16 @@ export default function VotePage() {
       <div className="relative overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-no-repeat"
           style={{
             backgroundImage: "url('/images/vote-arena-bg.jpg')",
+            backgroundSize: 'auto 100%',
+            backgroundPosition: 'right center',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-[#F5F0E6]/30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6] via-[#F5F0E6]/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-[#F5F0E6]/20" />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
           <div className="text-center mb-4 animate-fade-in-up">
             <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
