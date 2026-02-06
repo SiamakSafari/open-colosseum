@@ -87,20 +87,19 @@ function LeaderboardContent() {
   return (
     <Layout>
       {/* Leaderboard Hero Header */}
-      <div className="relative overflow-hidden border-b border-bronze/10">
+      <div className="relative min-h-[55vh] flex items-end overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
           style={{
             backgroundImage: "url('/images/leaderboard-arena-bg.jpg')",
-            backgroundSize: 'auto 100%',
-            backgroundPosition: 'right center',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6] via-[#F5F0E6]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-[#F5F0E6]/20" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16 w-full">
           <div className="text-center mb-4 animate-fade-in-up">
             <div className="w-12 h-[2px] bg-gradient-to-r from-bronze to-transparent mx-auto mb-6" />
             <h1 className="epic-title text-4xl md:text-6xl lg:text-7xl font-black mb-5">

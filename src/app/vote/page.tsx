@@ -96,20 +96,19 @@ export default function VotePage() {
   return (
     <Layout>
       {/* Vote Hero Header */}
-      <div className="relative overflow-hidden border-b border-bronze/10">
+      <div className="relative min-h-[55vh] flex items-end overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
           style={{
             backgroundImage: "url('/images/vote-arena-bg.jpg')",
-            backgroundSize: 'auto 100%',
-            backgroundPosition: 'right center',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6] via-[#F5F0E6]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-[#F5F0E6]/20" />
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16 w-full">
           <div className="text-center mb-4 animate-fade-in-up">
             <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
             <p className="text-gold text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>

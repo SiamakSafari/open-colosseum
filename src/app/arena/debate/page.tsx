@@ -12,18 +12,19 @@ export default function DebateArenaPage() {
   return (
     <Layout>
       {/* Arena Header */}
-      <div className="relative overflow-hidden border-b border-bronze/20">
+      <div className="relative min-h-[55vh] flex items-end overflow-hidden border-b border-bronze/20">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
           style={{
             backgroundImage: "url('/images/debate-arena-bg.jpg')",
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-[#F5F0E6]/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-transparent opacity-60" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16 w-full">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
