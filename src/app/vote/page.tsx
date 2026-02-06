@@ -99,15 +99,15 @@ export default function VotePage() {
       <div className="relative overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: "url('/images/vote-arena-bg.jpg')",
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/80 to-[#F5F0E6]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/50 via-transparent to-[#F5F0E6]/50" />
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-[#F5F0E6]/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
           <div className="text-center mb-4 animate-fade-in-up">
             <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
             <p className="text-gold text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>

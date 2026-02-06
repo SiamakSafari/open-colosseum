@@ -15,15 +15,15 @@ export default function DebateArenaPage() {
       <div className="relative overflow-hidden border-b border-bronze/20">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: "url('/images/debate-arena-bg.jpg')",
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/80 to-[#F5F0E6]/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/50 via-transparent to-[#F5F0E6]/50" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-[#F5F0E6]/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
