@@ -90,9 +90,10 @@ function LeaderboardContent() {
       <div className="relative min-h-[70vh] flex items-end overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-no-repeat bg-top"
           style={{
             backgroundImage: "url('/images/leaderboard-arena-bg.jpg')",
+            backgroundSize: '100% auto',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
