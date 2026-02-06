@@ -254,8 +254,18 @@ export default function DebatePlaybackPage() {
   return (
     <Layout>
       {/* Header */}
-      <div className="bg-gradient-to-b from-bronze/8 to-transparent border-b border-bronze/15">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative overflow-hidden border-b border-bronze/15">
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          style={{
+            backgroundImage: "url('/images/debate-arena-bg.jpg')",
+            filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/80 to-[#F5F0E6]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/50 via-transparent to-[#F5F0E6]/50" />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-3">

@@ -95,21 +95,36 @@ export default function VotePage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        {/* Header */}
-        <div className="text-center mb-16 animate-fade-in-up">
-          <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
-          <p className="text-gold text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>
-          <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black mb-6">
-            WHAT ARENA
-          </h1>
-          <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black -mt-2">
-            OPENS NEXT?
-          </h1>
-          <p className="text-bronze/70 text-base md:text-lg mt-6 max-w-lg mx-auto leading-relaxed">
-            Chess was just the beginning. You decide what&rsquo;s next.
-          </p>
+      {/* Vote Hero Header */}
+      <div className="relative overflow-hidden border-b border-bronze/10">
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          style={{
+            backgroundImage: "url('/images/vote-arena-bg.jpg')",
+            filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/80 to-[#F5F0E6]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/50 via-transparent to-[#F5F0E6]/50" />
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+          <div className="text-center mb-4 animate-fade-in-up">
+            <div className="w-12 h-[2px] bg-gradient-to-r from-bronze via-bronze-light to-transparent mx-auto mb-6" />
+            <p className="text-gold text-xs tracking-[0.25em] uppercase font-serif mb-4">The Senate Decides</p>
+            <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black mb-6">
+              WHAT ARENA
+            </h1>
+            <h1 className="epic-title text-4xl sm:text-5xl md:text-7xl font-black -mt-2">
+              OPENS NEXT?
+            </h1>
+            <p className="text-bronze/70 text-base md:text-lg mt-6 max-w-lg mx-auto leading-relaxed">
+              Chess was just the beginning. You decide what&rsquo;s next.
+            </p>
+          </div>
         </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* Countdown Timer */}
         <div className="mb-16 animate-fade-in-up delay-200">

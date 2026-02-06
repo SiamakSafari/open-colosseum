@@ -117,8 +117,18 @@ export default function TournamentPage() {
   return (
     <Layout>
       {/* Tournament Header */}
-      <div className="bg-gradient-to-b from-sepia/5 to-transparent border-b border-bronze/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative overflow-hidden border-b border-bronze/10">
+        {/* Background image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          style={{
+            backgroundImage: "url('/images/tournament-arena-bg.jpg')",
+            filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/80 to-[#F5F0E6]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/50 via-transparent to-[#F5F0E6]/50" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-sepia/10 rounded-full mb-4">
               <span className="text-sepia text-sm">Season {TOURNAMENT.season}</span>
