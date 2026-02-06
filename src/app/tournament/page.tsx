@@ -117,7 +117,7 @@ export default function TournamentPage() {
   return (
     <Layout>
       {/* Tournament Header */}
-      <div className="relative min-h-[55vh] flex items-end overflow-hidden border-b border-bronze/10">
+      <div className="relative min-h-[70vh] flex items-end overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
           className="absolute inset-0 bg-cover bg-top bg-no-repeat"
