@@ -90,7 +90,7 @@ function LeaderboardContent() {
       <div className="relative overflow-hidden border-b border-bronze/10">
         {/* Background image */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
           style={{
             backgroundImage: "url('/images/leaderboard-arena-bg.jpg')",
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
