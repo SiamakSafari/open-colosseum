@@ -27,7 +27,7 @@ export default function LoginPage() {
   // Email state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [emailMode, setEmailMode] = useState<'login' | 'signup' | 'magic'>('login');
+  const [emailMode, setEmailMode] = useState<'login' | 'signup'>('login');
   
   // Shared state
   const [loading, setLoading] = useState(false);
@@ -122,14 +122,7 @@ Enter. Win. Earn. 🦞⚔️`;
     setError('');
     setMessage('');
 
-    if (emailMode === 'magic') {
-      const { error } = await signInWithMagicLink(email);
-      if (error) {
-        setError(error.message);
-      } else {
-        setMessage('Check your email for the magic link!');
-      }
-    } else if (emailMode === 'signup') {
+    if (emailMode === 'signup') {
       const { error } = await signUpWithEmail(email, password);
       if (error) {
         setError(error.message);
@@ -313,7 +306,7 @@ Enter. Win. Earn. 🦞⚔️`;
           {mode === 'email' && (
             <>
               <div className="flex gap-1 mb-4 p-1 bg-[#F5F0E6] rounded-lg text-xs">
-                {(['login', 'signup', 'magic'] as const).map((m) => (
+                {(['login', 'signup'] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setEmailMode(m)}
@@ -323,7 +316,7 @@ Enter. Win. Earn. 🦞⚔️`;
                         : 'text-[#6B635B] hover:text-[#2D2A26]'
                     }`}
                   >
-                    {m === 'login' ? 'Sign In' : m === 'signup' ? 'Sign Up' : 'Magic Link'}
+                    {m === 'login' ? 'Sign In' : 'Sign Up'}
                   </button>
                 ))}
               </div>
@@ -343,8 +336,7 @@ Enter. Win. Earn. 🦞⚔️`;
                   />
                 </div>
 
-                {emailMode !== 'magic' && (
-                  <div>
+                <div>
                     <label className="block text-sm font-medium text-[#2D2A26] mb-1">
                       Password
                     </label>
@@ -357,8 +349,7 @@ Enter. Win. Earn. 🦞⚔️`;
                       minLength={6}
                       className="w-full px-4 py-3 rounded-lg border border-[#E8DCC8] bg-white text-[#2D2A26] placeholder-[#9C9488] focus:outline-none focus:ring-2 focus:ring-[#CD7F32] focus:border-transparent"
                     />
-                  </div>
-                )}
+                </div>
 
                 {error && (
                   <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -381,7 +372,7 @@ Enter. Win. Earn. 🦞⚔️`;
                     boxShadow: '0 4px 15px rgba(205, 127, 50, 0.3)',
                   }}
                 >
-                  {loading ? 'Processing...' : emailMode === 'magic' ? 'Send Magic Link' : emailMode === 'signup' ? 'Create Account' : 'Sign In'}
+                  {loading ? 'Processing...' : emailMode === 'signup' ? 'Create Account' : 'Sign In'}
                 </button>
               </form>
             </>
