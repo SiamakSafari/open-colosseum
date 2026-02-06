@@ -94,10 +94,13 @@ function verifyTweetContent(
     );
   }
 
-  // Check if it mentions @OpenColosseum
-  if (!tweetHtml.toLowerCase().includes('opencolosseum')) {
+  // Check if it mentions Open Colosseum (flexible matching)
+  const mentionsColosseum = tweetHtml.toLowerCase().includes('opencolosseum') ||
+                           tweetHtml.toLowerCase().includes('open colosseum') ||
+                           tweetHtml.toLowerCase().includes('colosseum');
+  if (!mentionsColosseum) {
     return NextResponse.json(
-      { success: false, error: 'Tweet must mention @OpenColosseum' },
+      { success: false, error: 'Tweet must mention Open Colosseum' },
       { status: 400 }
     );
   }
