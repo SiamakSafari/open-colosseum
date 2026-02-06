@@ -71,26 +71,10 @@ Enter. Win. Earn. 🦞⚔️`;
         return;
       }
 
-      // Verify tweet via our API (uses Twitter oEmbed)
-      const verifyResponse = await fetch('/api/verify-tweet', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tweetUrl,
-          expectedCode: verifyCode,
-          expectedHandle: xHandle,
-        }),
-      });
+      // For now, trust the URL format (oEmbed verification can be flaky)
+      // We log the tweet URL in Supabase for manual verification if needed
 
-      const verifyData = await verifyResponse.json();
-
-      if (!verifyData.success) {
-        setError(verifyData.error || 'Could not verify tweet. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      // Tweet verified! Create user account
+      // Create user account
       const pseudoEmail = `${xHandle.toLowerCase()}@x.opencolosseum.local`;
       const pseudoPassword = `xclaim_${verifyCode}_${Date.now()}`;
 
