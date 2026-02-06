@@ -16,7 +16,7 @@ function generateCode(): string {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'x-claim' | 'email'>('x-claim');
+  const [mode, setMode] = useState<'x-claim' | 'email'>('email');
   const [step, setStep] = useState<'handle' | 'verify'>('handle');
   
   // X Claim state
