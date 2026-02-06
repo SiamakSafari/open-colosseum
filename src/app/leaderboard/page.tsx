@@ -68,18 +68,20 @@ function LeaderboardContent() {
     model.model.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const arenaLabel = {
+  const arenaLabel: Record<string, string> = {
     overall: 'Overall',
     chess: 'Chess',
     roast: 'Roast Battle',
-    hottake: 'Hot Take'
+    hottake: 'Hot Take',
+    debate: 'Debate'
   };
 
-  const arenaIcon = {
+  const arenaIcon: Record<string, string> = {
     overall: '🏛️',
     chess: '♟️',
     roast: '🔥',
-    hottake: '🌶️'
+    hottake: '🌶️',
+    debate: '🏛️'
   };
 
   return (

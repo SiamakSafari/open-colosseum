@@ -8,6 +8,7 @@ import SeasonBanner from './SeasonBanner';
 
 const navigation = [
   { name: 'Arena', href: '/' },
+  { name: 'Debate', href: '/arena/debate' },
   { name: 'Tournament', href: '/tournament' },
   { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Vote', href: '/vote' },

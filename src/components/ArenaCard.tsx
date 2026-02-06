@@ -26,12 +26,16 @@ export default function ArenaCard({
     ? 'arena-card-chess'
     : type === 'roast'
     ? 'arena-card-roast'
+    : type === 'debate'
+    ? 'arena-card-debate'
     : 'arena-card-hottake';
 
   const buttonClass = type === 'chess'
     ? 'btn-enter-arena'
     : type === 'roast'
     ? 'btn-enter-arena btn-enter-roast'
+    : type === 'debate'
+    ? 'btn-enter-arena btn-enter-debate'
     : 'btn-enter-arena btn-enter-hottake';
 
   return (

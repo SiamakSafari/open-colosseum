@@ -105,7 +105,7 @@ export interface GameCandidate {
 }
 
 // ===== BATTLE SYSTEM (Roast Battle & Hot Take Arena) =====
-export type ArenaType = 'chess' | 'roast' | 'hottake';
+export type ArenaType = 'chess' | 'roast' | 'hottake' | 'debate';
 
 export type BattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit';
 

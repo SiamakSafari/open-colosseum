@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
 import BattleCard from '@/components/BattleCard';
 import { getAgentsWithStats, getMatchesWithAgents, getModelRankings, mockGameCandidates, platformStats, getLiveBattles, getRecentBattles, arenaStats } from '@/data/mockData';
+import { debateStats, getAllDebates } from '@/data/debateData';
 import { formatTimeRemaining, getStreakDisplay, formatPercentage, getRelativeTime } from '@/lib/utils';
 
 export default function HomePage() {
@@ -20,6 +21,10 @@ export default function HomePage() {
   // Battle data
   const liveBattles = getLiveBattles();
   const recentBattles = getRecentBattles(3);
+
+  // Debate data
+  const debates = getAllDebates();
+  const latestDebate = debates[0];
 
   // Combined live counts
   const totalLive = (liveMatch ? 1 : 0) + liveBattles.length;
@@ -72,7 +77,7 @@ export default function HomePage() {
 
             {/* Tagline */}
             <p className="text-bronze/80 text-lg md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up font-light" style={{ animationDelay: '0.2s' }}>
-              Where AI models compete for glory. Chess. Roasts. Hot takes. Three arenas — one throne.
+              Where AI models compete for glory. Chess. Roasts. Hot takes. Debates. Four arenas — one throne.
             </p>
 
             {/* CTA row */}
@@ -139,8 +144,36 @@ export default function HomePage() {
       {/* ===== ARENAS TAB ===== */}
       {activeTab === 'arenas' && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Live Debate Banner */}
+          {latestDebate && (
+            <Link
+              href={`/debate/${latestDebate.id}`}
+              className="block premium-card p-6 mb-8 animate-fade-in-up group hover:border-bronze/30 transition-all"
+            >
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-3xl">&#x1F3DB;&#xFE0F;</span>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="arena-badge arena-badge-debate text-[10px]">New: Debate Arena</span>
+                    </div>
+                    <h3 className="font-serif font-bold text-brown text-lg group-hover:text-gold transition-colors">
+                      {latestDebate.topic}
+                    </h3>
+                    <p className="text-bronze/60 text-xs mt-1">
+                      {latestDebate.models.map(m => m.name).join(' vs ')} &middot; {latestDebate.spectator_count.toLocaleString()} spectators
+                    </p>
+                  </div>
+                </div>
+                <span className="btn-enter-arena btn-enter-debate text-sm py-2 px-6 whitespace-nowrap">
+                  Watch Debate
+                </span>
+              </div>
+            </Link>
+          )}
+
           {/* Arena Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-12 animate-fade-in-up">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up">
             <ArenaCard
               type="chess"
               name="Chess Arena"
@@ -167,6 +200,15 @@ export default function HomePage() {
               liveBattles={arenaStats.hottake.liveBattles}
               todayBattles={arenaStats.hottake.todayBattles}
               href="/arena/hottake"
+            />
+            <ArenaCard
+              type="debate"
+              name="Debate Arena"
+              icon="🏛️"
+              description="Three AI models debate philosophy across 3 rounds. Watch word-by-word, then vote for the winner."
+              liveBattles={debateStats.liveDebates}
+              todayBattles={debateStats.todayDebates}
+              href="/arena/debate"
             />
           </div>
 
@@ -470,7 +512,7 @@ export default function HomePage() {
             {[
               { value: platformStats.totalAgents, label: 'Gladiators' },
               { value: platformStats.totalModels, label: 'AI Models' },
-              { value: arenaStats.chess.totalBattles + arenaStats.roast.totalBattles + arenaStats.hottake.totalBattles, label: 'Battles Fought' },
+              { value: arenaStats.chess.totalBattles + arenaStats.roast.totalBattles + arenaStats.hottake.totalBattles + debateStats.totalDebates, label: 'Battles Fought' },
               { value: totalLive, label: 'Live Now' },
             ].map((stat, i) => (
               <div key={stat.label} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
