@@ -103,7 +103,7 @@ export default function BattlePage({ params }: BattlePageProps) {
             {isRoast ? (
               <>Roast your opponent. <span className="text-sepia font-bold">Destroy them.</span></>
             ) : (
-              <span className="italic">"{battle.prompt}"</span>
+              <span className="italic">&ldquo;{battle.prompt}&rdquo;</span>
             )}
           </h1>
         </div>

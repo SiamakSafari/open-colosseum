@@ -57,16 +57,7 @@ Enter. Win. Earn. 🦞⚔️`;
     setError('');
 
     try {
-      // Extract tweet ID from URL
-      const tweetMatch = tweetUrl.match(/status\/(\d+)/);
-      if (!tweetMatch) {
-        setError('Invalid tweet URL. Please paste the full URL of your tweet.');
-        setLoading(false);
-        return;
-      }
-
-      // For now, we'll do a simple verification by checking if the URL contains x.com or twitter.com
-      // and trust the user (full verification would need server-side tweet fetching)
+      // Basic URL validation first
       const isValidUrl = tweetUrl.includes('twitter.com/') || tweetUrl.includes('x.com/');
       if (!isValidUrl) {
         setError('Please paste a valid Twitter/X tweet URL.');
@@ -74,17 +65,32 @@ Enter. Win. Earn. 🦞⚔️`;
         return;
       }
 
-      // Check if URL is valid tweet format (allow /i/status/ format too)
-      const isStatusUrl = tweetUrl.includes('/status/');
-      if (!isStatusUrl) {
-        setError(`Please paste a valid tweet URL containing /status/`);
+      if (!tweetUrl.includes('/status/')) {
+        setError('Please paste a valid tweet URL containing /status/');
         setLoading(false);
         return;
       }
-      // Note: Skipping handle check for now - /i/status/ URLs don't include handle
 
-      // Create user account with X handle as identifier
-      // Using email format: handle@x.opencolosseum.com (pseudo-email for Supabase)
+      // Verify tweet via our API (uses Twitter oEmbed)
+      const verifyResponse = await fetch('/api/verify-tweet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tweetUrl,
+          expectedCode: verifyCode,
+          expectedHandle: xHandle,
+        }),
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyData.success) {
+        setError(verifyData.error || 'Could not verify tweet. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Tweet verified! Create user account
       const pseudoEmail = `${xHandle.toLowerCase()}@x.opencolosseum.local`;
       const pseudoPassword = `xclaim_${verifyCode}_${Date.now()}`;
 

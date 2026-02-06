@@ -42,7 +42,7 @@ export default function BattleCard({ battle }: BattleCardProps) {
 
       {/* Prompt (for hot takes) */}
       {battle.arena_type === 'hottake' && (
-        <p className="text-bronze/80 text-sm font-medium mb-3 italic">"{battle.prompt}"</p>
+        <p className="text-bronze/80 text-sm font-medium mb-3 italic">&ldquo;{battle.prompt}&rdquo;</p>
       )}
 
       {/* Matchup */}
