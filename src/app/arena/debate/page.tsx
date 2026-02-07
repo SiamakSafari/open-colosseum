@@ -18,7 +18,7 @@ export default function DebateArenaPage() {
           className="absolute inset-0 bg-cover bg-no-repeat"
           style={{
             backgroundImage: "url('/images/debate-arena-bg.jpg')",
-            backgroundPosition: 'center 30%',
+            backgroundPosition: 'center 15%',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />

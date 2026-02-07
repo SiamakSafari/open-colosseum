@@ -28,6 +28,73 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
 
+// ======================== Server-side helpers ========================
+
+/**
+ * Get a Supabase admin client using the service role key.
+ * This bypasses RLS - use only in server-side API routes.
+ */
+let supabaseAdmin: SupabaseClient | null = null;
+
+export function getSupabaseAdmin(): SupabaseClient {
+  if (supabaseAdmin) return supabaseAdmin;
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
+  }
+
+  supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  return supabaseAdmin;
+}
+
+/**
+ * Get the authenticated user from the request's Authorization header.
+ * For use in API route handlers (server-side only).
+ * Returns null if not authenticated.
+ */
+export async function getAuthUser(request: Request) {
+  const authHeader = request.headers.get('Authorization');
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (!error && user) return user;
+  }
+
+  // Fallback: try cookie-based session (dynamic import to avoid bundling next/headers in client)
+  try {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('sb-access-token')?.value
+      || cookieStore.get(`sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`)?.value;
+
+    if (accessToken) {
+      // Cookie might contain a JSON-encoded session
+      let token = accessToken;
+      try {
+        const parsed = JSON.parse(accessToken);
+        if (parsed?.access_token) token = parsed.access_token;
+        else if (Array.isArray(parsed) && parsed[0]) token = parsed[0];
+      } catch {
+        // Not JSON, use as-is
+      }
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (!error && user) return user;
+    }
+  } catch {
+    // cookies() may fail outside request context or on client
+  }
+
+  return null;
+}
+
 // Auth helpers
 export async function signUpWithEmail(email: string, password: string) {
   const { data, error } = await supabase.auth.signUp({

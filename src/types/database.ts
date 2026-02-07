@@ -1,3 +1,7 @@
+// ============================================================
+// Existing UI Types (unchanged - used by all 16 pages)
+// ============================================================
+
 export interface Agent {
   id: string;
   user_id?: string;
@@ -174,3 +178,261 @@ export const HOT_TAKES = [
 ] as const;
 
 export type HotTake = typeof HOT_TAKES[number];
+
+// ============================================================
+// Database Row Types (Db* prefix - match Supabase schema)
+// ============================================================
+
+// Enum types matching PostgreSQL enums
+export type DbArenaType = 'chess' | 'roast' | 'hottake' | 'debate';
+export type DbMatchStatus = 'pending' | 'active' | 'completed' | 'aborted';
+export type DbMatchResult = 'white_win' | 'black_win' | 'draw' | 'aborted';
+export type DbMatchResultMethod = 'checkmate' | 'timeout' | 'resignation' | 'stalemate' | 'forfeit';
+export type DbBattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit';
+export type DbVotedForOption = 'a' | 'b' | 'c';
+export type DbTransactionType = 'entry_fee' | 'prize' | 'bet_win' | 'bet_loss' | 'sponsorship' | 'bonus' | 'transfer';
+export type DbTournamentStatus = 'upcoming' | 'registration' | 'active' | 'completed' | 'cancelled';
+export type DbBetPoolStatus = 'open' | 'locked' | 'settled' | 'cancelled';
+export type DbBetSide = 'a' | 'b' | 'c';
+export type DbSponsorshipStatus = 'active' | 'completed' | 'cancelled';
+
+// 1. agents
+export interface DbAgent {
+  id: string;
+  user_id: string;
+  name: string;
+  model: string;
+  api_key_encrypted: string | null;
+  system_prompt: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// 2. agent_arena_stats
+export interface DbAgentArenaStats {
+  id: string;
+  agent_id: string;
+  arena_type: DbArenaType;
+  elo: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  peak_elo: number;
+  streak: number;
+  total_matches: number;
+  updated_at: string;
+}
+
+// 3. matches
+export interface DbMatch {
+  id: string;
+  white_agent_id: string;
+  black_agent_id: string;
+  status: DbMatchStatus;
+  result: DbMatchResult | null;
+  result_method: DbMatchResultMethod | null;
+  pgn: string | null;
+  final_fen: string | null;
+  total_moves: number;
+  time_control_seconds: number | null;
+  white_time_remaining: number | null;
+  black_time_remaining: number | null;
+  white_elo_before: number | null;
+  black_elo_before: number | null;
+  white_elo_after: number | null;
+  black_elo_after: number | null;
+  spectator_count: number;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// 4. chess_moves
+export interface DbChessMove {
+  id: string;
+  match_id: string;
+  move_number: number;
+  agent_id: string;
+  move_san: string;
+  fen_after: string;
+  time_taken_ms: number | null;
+  created_at: string;
+}
+
+// 5. battles
+export interface DbBattle {
+  id: string;
+  arena_type: DbArenaType;
+  agent_a_id: string;
+  agent_b_id: string;
+  agent_c_id: string | null;
+  status: DbBattleStatus;
+  prompt: string;
+  response_a: string | null;
+  response_b: string | null;
+  response_c: string | null;
+  response_a_at: string | null;
+  response_b_at: string | null;
+  response_c_at: string | null;
+  votes_a: number;
+  votes_b: number;
+  votes_c: number;
+  total_votes: number;
+  winner_id: string | null;
+  agent_a_elo_before: number | null;
+  agent_b_elo_before: number | null;
+  agent_c_elo_before: number | null;
+  agent_a_elo_after: number | null;
+  agent_b_elo_after: number | null;
+  agent_c_elo_after: number | null;
+  spectator_count: number;
+  voting_deadline: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+// 6. votes
+export interface DbVote {
+  id: string;
+  battle_id: string;
+  user_id: string | null;
+  session_token: string;
+  ip_address: string;
+  voted_for: DbVotedForOption;
+  created_at: string;
+}
+
+// 7. wallets
+export interface DbWallet {
+  id: string;
+  agent_id: string;
+  balance: number;
+  total_earned: number;
+  total_spent: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 8. transactions
+export interface DbTransaction {
+  id: string;
+  wallet_id: string;
+  type: DbTransactionType;
+  amount: number;
+  balance_after: number;
+  reference_type: string | null;
+  reference_id: string | null;
+  description: string | null;
+  created_at: string;
+}
+
+// 9. bet_pools
+export interface DbBetPool {
+  id: string;
+  match_id: string | null;
+  battle_id: string | null;
+  status: DbBetPoolStatus;
+  total_pool_a: number;
+  total_pool_b: number;
+  total_pool_c: number;
+  rake_percentage: number;
+  winner: DbBetSide | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+// 10. bets
+export interface DbBet {
+  id: string;
+  pool_id: string;
+  wallet_id: string;
+  side: DbBetSide;
+  amount: number;
+  potential_payout: number | null;
+  actual_payout: number | null;
+  created_at: string;
+}
+
+// 11. sponsorships
+export interface DbSponsorship {
+  id: string;
+  agent_id: string;
+  sponsor_wallet_id: string;
+  stake_amount: number;
+  profit_share_percentage: number;
+  status: DbSponsorshipStatus;
+  total_returns: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 12. tournaments
+export interface DbTournament {
+  id: string;
+  name: string;
+  season: number;
+  arena_type: DbArenaType;
+  status: DbTournamentStatus;
+  prize_pool: number;
+  max_participants: number | null;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 13. tournament_participants
+export interface DbTournamentParticipant {
+  id: string;
+  tournament_id: string;
+  agent_id: string;
+  seed: number | null;
+  placement: number | null;
+  eliminated_at: string | null;
+  created_at: string;
+}
+
+// 14. arena_votes
+export interface DbArenaVote {
+  id: string;
+  user_id: string | null;
+  session_token: string;
+  arena_name: string;
+  created_at: string;
+}
+
+// View types
+export interface DbAgentPublic {
+  id: string;
+  user_id: string;
+  name: string;
+  model: string;
+  system_prompt: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbLeaderboardRow {
+  agent_id: string;
+  agent_name: string;
+  model: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  arena_type: DbArenaType;
+  elo: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  peak_elo: number;
+  streak: number;
+  total_matches: number;
+  rank: number;
+  win_rate: number;
+}
