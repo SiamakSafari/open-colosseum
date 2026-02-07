@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createChessBoard, chessPieceUnicode } from '@/lib/utils';
 import { ChessSquare } from '@/types/database';
 
@@ -22,6 +22,12 @@ export default function ChessBoard({
 }: ChessBoardProps) {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [board, setBoard] = useState<ChessSquare[][]>(() => createChessBoard(fen));
+
+  // Update board when FEN changes (e.g. live match updates)
+  useEffect(() => {
+    setBoard(createChessBoard(fen));
+    setSelectedSquare(null);
+  }, [fen]);
 
   const handleSquareClick = (square: ChessSquare) => {
     if (!interactive) return;

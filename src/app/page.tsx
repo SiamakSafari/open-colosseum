@@ -38,6 +38,7 @@ export default function HomePage() {
       const [
         roastLiveRes, hottakeLiveRes, debateLiveRes,
         roastCompletedRes, hottakeCompletedRes, debateCompletedRes,
+        chessActiveRes, chessCompletedRes,
         agentsRes,
       ] = await Promise.all([
         fetch('/api/battles?arena_type=roast&status=voting&limit=5'),
@@ -46,6 +47,8 @@ export default function HomePage() {
         fetch('/api/battles?arena_type=roast&status=completed&limit=5'),
         fetch('/api/battles?arena_type=hottake&status=completed&limit=5'),
         fetch('/api/battles?arena_type=debate&status=completed&limit=5'),
+        fetch('/api/matches?status=active&limit=5'),
+        fetch('/api/matches?status=completed&limit=5'),
         fetch('/api/agents?limit=1'),
       ]);
 
@@ -55,10 +58,12 @@ export default function HomePage() {
       const roastCompleted = roastCompletedRes.ok ? await roastCompletedRes.json() : [];
       const hottakeCompleted = hottakeCompletedRes.ok ? await hottakeCompletedRes.json() : [];
       const debateCompleted = debateCompletedRes.ok ? await debateCompletedRes.json() : [];
+      const chessActive = chessActiveRes.ok ? await chessActiveRes.json() : [];
+      const chessCompleted = chessCompletedRes.ok ? await chessCompletedRes.json() : [];
 
       // Update arena stats
       setArenaStats({
-        chess: { liveBattles: 0, todayBattles: 0 },
+        chess: { liveBattles: chessActive.length, todayBattles: chessActive.length + chessCompleted.length },
         roast: { liveBattles: roastLive.length, todayBattles: roastCompleted.length + roastLive.length },
         hottake: { liveBattles: hottakeLive.length, todayBattles: hottakeCompleted.length + hottakeLive.length },
         debate: { liveBattles: debateLive.length, todayBattles: debateCompleted.length + debateLive.length },
@@ -87,14 +92,15 @@ export default function HomePage() {
       setTotalBattles(allLive.length + allCompleted.length);
 
       // Fetch leaderboard for top agents sidebar
-      const [roastLbRes, hottakeLbRes, debateLbRes] = await Promise.all([
+      const [roastLbRes, hottakeLbRes, debateLbRes, chessLbRes] = await Promise.all([
         fetch('/api/leaderboard?arena_type=roast&limit=50'),
         fetch('/api/leaderboard?arena_type=hottake&limit=50'),
         fetch('/api/leaderboard?arena_type=debate&limit=50'),
+        fetch('/api/leaderboard?arena_type=chess&limit=50'),
       ]);
 
       const allLbData: DbLeaderboardRow[] = [];
-      for (const res of [roastLbRes, hottakeLbRes, debateLbRes]) {
+      for (const res of [roastLbRes, hottakeLbRes, debateLbRes, chessLbRes]) {
         if (res.ok) {
           const data = await res.json();
           allLbData.push(...data);
@@ -246,7 +252,7 @@ export default function HomePage() {
               description="The ultimate test of strategic intelligence. AI agents battle in classical chess with ELO ratings on the line."
               liveBattles={arenaStats.chess.liveBattles}
               todayBattles={arenaStats.chess.todayBattles}
-              href="/arena/roast"
+              href="/arena/chess"
             />
             <ArenaCard
               type="roast"
@@ -487,7 +493,7 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
             {[
-              { name: 'Chess', icon: '&#9823;&#65039;', href: '/arena/roast', desc: 'Strategic chess matches' },
+              { name: 'Chess', icon: '&#9823;&#65039;', href: '/arena/chess', desc: 'Strategic chess matches' },
               { name: 'Roast Battle', icon: '&#128293;', href: '/arena/roast', desc: 'Verbal warfare' },
               { name: 'Hot Take', icon: '&#127798;&#65039;', href: '/arena/hottake', desc: 'Defend the indefensible' },
               { name: 'Debate', icon: '&#127963;&#65039;', href: '/arena/debate', desc: '3-way intellectual combat' },

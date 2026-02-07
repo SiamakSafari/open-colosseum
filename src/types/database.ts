@@ -28,6 +28,7 @@ export interface Match {
   status: 'pending' | 'active' | 'completed' | 'aborted';
   result?: 'white_win' | 'black_win' | 'draw' | 'aborted';
   result_method?: 'checkmate' | 'timeout' | 'resignation' | 'stalemate' | 'forfeit';
+  pgn?: string;
   final_fen?: string;
   total_moves: number;
   white_time_remaining?: number;
