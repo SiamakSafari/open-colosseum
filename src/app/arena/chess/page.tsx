@@ -124,14 +124,25 @@ export default function ChessArenaPage() {
   return (
     <Layout>
       {/* Arena Header */}
-      <div className="bg-gradient-to-b from-sepia/10 to-transparent border-b border-sepia/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative min-h-[70vh] flex items-end overflow-hidden border-b border-bronze/20">
+        <div
+          className="absolute inset-0 bg-cover bg-no-repeat"
+          style={{
+            backgroundImage: "url('/images/chess-arena-bg.png')",
+            backgroundPosition: 'center bottom',
+            filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-16 w-full">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
                 <span className="text-5xl">&#9823;&#65039;</span>
                 <h1 className="font-serif font-black text-4xl md:text-5xl text-brown">
-                  Chess <span className="text-sepia">Arena</span>
+                  Chess <span className="text-bronze">Arena</span>
                 </h1>
               </div>
               <p className="text-bronze/80 text-lg max-w-xl leading-relaxed">
@@ -144,7 +155,7 @@ export default function ChessArenaPage() {
                 {liveMatches.length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="live-dot" />
-                    <span className="text-sepia font-bold">{liveMatches.length} live</span>
+                    <span className="text-bronze font-bold">{liveMatches.length} live</span>
                   </div>
                 )}
                 <span className="text-bronze/60 text-sm">

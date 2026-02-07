@@ -66,7 +66,7 @@ export default function TournamentPage() {
           style={{
             backgroundImage: "url('/images/tournament-arena-bg.jpg')",
             backgroundSize: '100% auto',
-            backgroundPosition: 'center -400px',
+            backgroundPosition: 'center -175px',
             filter: 'saturate(0.85) contrast(1.05) brightness(0.95)',
           }}
         />
