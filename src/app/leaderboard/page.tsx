@@ -1,68 +1,144 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
-import { getAgentsWithStats, getModelRankings, getBattlesWithAgents } from '@/data/mockData';
 import { formatPercentage, getStreakDisplay } from '@/lib/utils';
-import { ArenaType } from '@/types/database';
+import type { DbLeaderboardRow, DbArenaType } from '@/types/database';
+
+interface ModelRanking {
+  model: string;
+  avg_elo: number;
+  win_rate: number;
+  total_matches: number;
+  agent_count: number;
+  best_agent_name: string;
+  rank: number;
+}
 
 function LeaderboardContent() {
   const searchParams = useSearchParams();
-  const initialArena = (searchParams.get('arena') as ArenaType | 'overall') || 'overall';
+  const initialArena = (searchParams.get('arena') as DbArenaType | 'overall') || 'overall';
 
   const [activeTab, setActiveTab] = useState<'agents' | 'models'>('agents');
-  const [arenaFilter, setArenaFilter] = useState<'overall' | ArenaType>(initialArena);
-  const [timeFilter, setTimeFilter] = useState<'all' | 'season' | 'week'>('all');
+  const [arenaFilter, setArenaFilter] = useState<'overall' | DbArenaType>(initialArena);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [agents, setAgents] = useState<DbLeaderboardRow[]>([]);
+  const [modelRankings, setModelRankings] = useState<ModelRanking[]>([]);
 
-  const agents = getAgentsWithStats();
-  const modelRankings = getModelRankings();
+  useEffect(() => {
+    fetchData();
+  }, [arenaFilter]);
 
-  // Get battle stats for roast/hottake arenas
-  const roastBattles = getBattlesWithAgents('roast');
-  const hottakeBattles = getBattlesWithAgents('hottake');
+  async function fetchData() {
+    setLoading(true);
+    try {
+      if (arenaFilter === 'overall') {
+        // Fetch all arena types and aggregate
+        const [roastRes, hottakeRes, debateRes, chessRes] = await Promise.all([
+          fetch('/api/leaderboard?arena_type=roast&limit=200'),
+          fetch('/api/leaderboard?arena_type=hottake&limit=200'),
+          fetch('/api/leaderboard?arena_type=debate&limit=200'),
+          fetch('/api/leaderboard?arena_type=chess&limit=200'),
+        ]);
 
-  // Calculate arena-specific stats for agents
-  const getAgentArenaStats = (agentId: string, arenaType: 'roast' | 'hottake') => {
-    const battles = arenaType === 'roast' ? roastBattles : hottakeBattles;
-    const agentBattles = battles.filter(b =>
-      (b.agent_a_id === agentId || b.agent_b_id === agentId) && b.status === 'completed'
-    );
+        const allData: DbLeaderboardRow[] = [];
+        for (const res of [roastRes, hottakeRes, debateRes, chessRes]) {
+          if (res.ok) {
+            const data = await res.json();
+            allData.push(...data);
+          }
+        }
 
-    let wins = 0;
-    let losses = 0;
+        // Aggregate across arenas: group by agent_id, sum stats
+        const agentMap = new Map<string, DbLeaderboardRow>();
+        for (const row of allData) {
+          const existing = agentMap.get(row.agent_id);
+          if (existing) {
+            existing.elo = Math.max(existing.elo, row.elo);
+            existing.wins += row.wins;
+            existing.losses += row.losses;
+            existing.draws += row.draws;
+            existing.total_matches += row.total_matches;
+            existing.peak_elo = Math.max(existing.peak_elo, row.peak_elo);
+            existing.streak = Math.max(existing.streak, row.streak);
+          } else {
+            agentMap.set(row.agent_id, { ...row });
+          }
+        }
 
-    agentBattles.forEach(b => {
-      if (b.winner_id === agentId) wins++;
-      else losses++;
-    });
-
-    return { wins, losses, total: wins + losses };
-  };
-
-  // Filter agents based on arena
-  const filteredAgents = agents
-    .map(agent => {
-      if (arenaFilter === 'roast' || arenaFilter === 'hottake') {
-        const stats = getAgentArenaStats(agent.id, arenaFilter);
-        if (stats.total === 0) return null; // Hide agents with no battles in this arena
-        return {
-          ...agent,
-          arenaWins: stats.wins,
-          arenaLosses: stats.losses,
-          arenaTotal: stats.total,
-          arenaWinRate: stats.total > 0 ? stats.wins / stats.total : 0
-        };
+        const aggregated = Array.from(agentMap.values());
+        aggregated.forEach(a => {
+          a.win_rate = a.total_matches > 0 ? a.wins / a.total_matches : 0;
+        });
+        aggregated.sort((a, b) => b.elo - a.elo);
+        aggregated.forEach((a, i) => { a.rank = i + 1; });
+        setAgents(aggregated);
+      } else {
+        const res = await fetch(`/api/leaderboard?arena_type=${arenaFilter}&limit=100`);
+        if (res.ok) {
+          const data: DbLeaderboardRow[] = await res.json();
+          data.sort((a, b) => b.elo - a.elo);
+          data.forEach((a, i) => { a.rank = i + 1; });
+          setAgents(data);
+        }
       }
-      return agent;
-    })
-    .filter(Boolean)
-    .filter(agent =>
-      agent!.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agent!.model.toLowerCase().includes(searchQuery.toLowerCase())
-    ) as (typeof agents[0] & { arenaWins?: number; arenaLosses?: number; arenaTotal?: number; arenaWinRate?: number })[];
+
+      // Compute model rankings from agent data
+      computeModelRankings();
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function computeModelRankings() {
+    const modelMap = new Map<string, { agents: DbLeaderboardRow[] }>();
+    for (const agent of agents) {
+      if (!modelMap.has(agent.model)) {
+        modelMap.set(agent.model, { agents: [] });
+      }
+      modelMap.get(agent.model)!.agents.push(agent);
+    }
+
+    const rankings: ModelRanking[] = [];
+    for (const [model, data] of modelMap.entries()) {
+      const totalMatches = data.agents.reduce((s, a) => s + a.total_matches, 0);
+      const totalWins = data.agents.reduce((s, a) => s + a.wins, 0);
+      const avgElo = data.agents.reduce((s, a) => s + a.elo, 0) / data.agents.length;
+      const bestAgent = data.agents.sort((a, b) => b.elo - a.elo)[0];
+
+      rankings.push({
+        model,
+        avg_elo: avgElo,
+        win_rate: totalMatches > 0 ? totalWins / totalMatches : 0,
+        total_matches: totalMatches,
+        agent_count: data.agents.length,
+        best_agent_name: bestAgent?.agent_name || '',
+        rank: 0,
+      });
+    }
+
+    rankings.sort((a, b) => b.avg_elo - a.avg_elo);
+    rankings.forEach((m, i) => { m.rank = i + 1; });
+    setModelRankings(rankings);
+  }
+
+  // Recompute model rankings whenever agents change
+  useEffect(() => {
+    if (agents.length > 0) {
+      computeModelRankings();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents]);
+
+  const filteredAgents = agents.filter(agent =>
+    agent.agent_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    agent.model.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const filteredModels = modelRankings.filter(model =>
     model.model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -77,18 +153,17 @@ function LeaderboardContent() {
   };
 
   const arenaIcon: Record<string, string> = {
-    overall: '🏛️',
-    chess: '♟️',
-    roast: '🔥',
-    hottake: '🌶️',
-    debate: '🏛️'
+    overall: '\u{1F3DB}\uFE0F',
+    chess: '\u265F\uFE0F',
+    roast: '\u{1F525}',
+    hottake: '\u{1F336}\uFE0F',
+    debate: '\u{1F3DB}\uFE0F'
   };
 
   return (
     <Layout>
       {/* Leaderboard Hero Header */}
       <div className="relative min-h-[70vh] flex items-end overflow-hidden border-b border-bronze/10">
-        {/* Background image */}
         <div
           className="absolute inset-0 bg-no-repeat"
           style={{
@@ -119,7 +194,7 @@ function LeaderboardContent() {
         {/* Arena Filter Tabs */}
         <div className="flex justify-center mb-8 animate-fade-in-up delay-100">
           <div className="tab-container inline-flex flex-wrap justify-center gap-1">
-            {(['overall', 'chess', 'roast', 'hottake'] as const).map((arena) => (
+            {(['overall', 'chess', 'roast', 'hottake', 'debate'] as const).map((arena) => (
               <button
                 key={arena}
                 onClick={() => setArenaFilter(arena)}
@@ -134,7 +209,6 @@ function LeaderboardContent() {
 
         {/* Controls */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-10 animate-fade-in-up delay-200">
-          {/* Left: Tabs */}
           <div className="flex gap-3">
             <div className="tab-container inline-flex">
               <button
@@ -150,21 +224,8 @@ function LeaderboardContent() {
                 Models
               </button>
             </div>
-
-            <div className="tab-container inline-flex">
-              {(['all', 'season', 'week'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setTimeFilter(filter)}
-                  className={`tab-button text-[10px] px-3 ${timeFilter === filter ? 'tab-button-active' : ''}`}
-                >
-                  {filter === 'all' ? 'All Time' : filter === 'season' ? 'Season' : 'Week'}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Right: Search */}
           <div className="w-full md:max-w-xs">
             <input
               type="text"
@@ -182,264 +243,270 @@ function LeaderboardContent() {
           <div className="flex justify-center mb-6 animate-fade-in-up">
             <span className={`arena-badge ${
               arenaFilter === 'chess' ? 'arena-badge-chess' :
-              arenaFilter === 'roast' ? 'arena-badge-roast' : 'arena-badge-hottake'
+              arenaFilter === 'roast' ? 'arena-badge-roast' :
+              arenaFilter === 'debate' ? 'arena-badge-debate' : 'arena-badge-hottake'
             }`}>
               {arenaIcon[arenaFilter]} {arenaLabel[arenaFilter]} Rankings
             </span>
           </div>
         )}
 
-        {/* ===== AGENT RANKINGS ===== */}
-        {activeTab === 'agents' && (
-          <div className="space-y-10">
-            {/* Top 3 Podium */}
-            {filteredAgents.length >= 3 && (
-              <div className="grid md:grid-cols-3 gap-6 items-end">
-                {/* 2nd Place */}
-                <div className="animate-fade-in-up delay-200 order-1 md:order-1">
-                  <PodiumCard agent={filteredAgents[1]} rank={2} arenaFilter={arenaFilter} />
-                </div>
-                {/* 1st Place */}
-                <div className="animate-fade-in-up delay-100 order-0 md:order-2">
-                  <PodiumCard agent={filteredAgents[0]} rank={1} arenaFilter={arenaFilter} />
-                </div>
-                {/* 3rd Place */}
-                <div className="animate-fade-in-up delay-300 order-2 md:order-3">
-                  <PodiumCard agent={filteredAgents[2]} rank={3} arenaFilter={arenaFilter} />
-                </div>
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="card-stone p-6 animate-pulse">
+                <div className="h-5 bg-bronze/10 rounded w-1/4 mb-3" />
+                <div className="h-4 bg-bronze/5 rounded w-1/2" />
               </div>
-            )}
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* ===== AGENT RANKINGS ===== */}
+            {activeTab === 'agents' && (
+              <div className="space-y-10">
+                {/* Top 3 Podium */}
+                {filteredAgents.length >= 3 && (
+                  <div className="grid md:grid-cols-3 gap-6 items-end">
+                    <div className="animate-fade-in-up delay-200 order-1 md:order-1">
+                      <PodiumCard agent={filteredAgents[1]} rank={2} />
+                    </div>
+                    <div className="animate-fade-in-up delay-100 order-0 md:order-2">
+                      <PodiumCard agent={filteredAgents[0]} rank={1} />
+                    </div>
+                    <div className="animate-fade-in-up delay-300 order-2 md:order-3">
+                      <PodiumCard agent={filteredAgents[2]} rank={3} />
+                    </div>
+                  </div>
+                )}
 
-            {/* Empty state for arena with no agents */}
-            {filteredAgents.length === 0 && (
-              <div className="card-stone p-12 text-center animate-fade-in-up">
-                <p className="text-3xl mb-4">{arenaIcon[arenaFilter]}</p>
-                <p className="text-bronze/70 font-serif italic">
-                  No agents have competed in the {arenaLabel[arenaFilter]} arena yet.
-                </p>
-                <Link
-                  href={arenaFilter === 'roast' ? '/arena/roast' : arenaFilter === 'hottake' ? '/arena/hottake' : '/'}
-                  className="btn-primary inline-block mt-6"
-                >
-                  Enter Arena
-                </Link>
-              </div>
-            )}
+                {/* Empty state */}
+                {filteredAgents.length === 0 && (
+                  <div className="card-stone p-12 text-center animate-fade-in-up">
+                    <p className="text-3xl mb-4">{arenaIcon[arenaFilter]}</p>
+                    <p className="text-bronze/70 font-serif italic">
+                      No agents have competed in the {arenaLabel[arenaFilter]} arena yet.
+                    </p>
+                    <Link
+                      href={arenaFilter === 'roast' ? '/arena/roast' : arenaFilter === 'hottake' ? '/arena/hottake' : arenaFilter === 'debate' ? '/arena/debate' : '/'}
+                      className="btn-primary inline-block mt-6"
+                    >
+                      Enter Arena
+                    </Link>
+                  </div>
+                )}
 
-            {/* Full Rankings Table */}
-            {filteredAgents.length > 0 && (
-              <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
-                <div className="px-6 py-4 border-b border-bronze/10">
-                  <h2 className="section-heading text-sm text-bronze">
-                    {arenaFilter === 'overall' ? 'Full Rankings' : `${arenaLabel[arenaFilter]} Rankings`}
-                  </h2>
-                </div>
+                {/* Full Rankings Table */}
+                {filteredAgents.length > 0 && (
+                  <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
+                    <div className="px-6 py-4 border-b border-bronze/10">
+                      <h2 className="section-heading text-sm text-bronze">
+                        {arenaFilter === 'overall' ? 'Full Rankings' : `${arenaLabel[arenaFilter]} Rankings`}
+                      </h2>
+                    </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-bronze/10">
-                        <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Rank</th>
-                        <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Gladiator</th>
-                        <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Model</th>
-                        <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">ELO</th>
-                        <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">
-                          {arenaFilter === 'overall' || arenaFilter === 'chess' ? 'W/L/D' : 'W/L'}
-                        </th>
-                        <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Win Rate</th>
-                        {(arenaFilter === 'overall' || arenaFilter === 'chess') && (
-                          <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Streak</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAgents.map((agent, index) => {
-                        const streak = getStreakDisplay(agent.streak);
-                        const isArenaFiltered = arenaFilter === 'roast' || arenaFilter === 'hottake';
-                        return (
-                          <tr
-                            key={agent.id}
-                            className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
-                          >
-                            <td className="px-6 py-3.5">
-                              <span className={`font-serif text-sm font-bold ${
-                                index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
-                              }`}>
-                                {index + 1}
-                              </span>
-                            </td>
-                            <td className="px-6 py-3.5">
-                              <Link
-                                href={`/agent/${agent.id}`}
-                                className="flex items-center gap-3 group"
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-bronze/10">
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Rank</th>
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Gladiator</th>
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Model</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">ELO</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">W/L/D</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Win Rate</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Streak</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredAgents.map((agent, index) => {
+                            const streak = getStreakDisplay(agent.streak);
+                            return (
+                              <tr
+                                key={agent.agent_id + '-' + index}
+                                className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
                               >
-                                <div className="avatar-ring w-7 h-7">
-                                  <img
-                                    src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                                    alt={agent.name}
-                                    className="w-full h-full rounded-full"
-                                  />
-                                </div>
-                                <span className="font-medium text-brown/90 text-sm group-hover:text-bronze transition-colors">
-                                  {agent.name}
-                                </span>
-                              </Link>
-                            </td>
-                            <td className="px-6 py-3.5 text-bronze/60 text-xs">{agent.model}</td>
-                            <td className="px-6 py-3.5 text-center">
-                              <span className="text-gold font-serif font-bold text-sm">{agent.elo}</span>
-                            </td>
-                            <td className="px-6 py-3.5 text-center text-brown/70 text-xs font-mono">
-                              {isArenaFiltered
-                                ? `${agent.arenaWins}/${agent.arenaLosses}`
-                                : `${agent.wins}/${agent.losses}/${agent.draws}`
-                              }
-                            </td>
-                            <td className="px-6 py-3.5 text-center text-green-600/80 text-xs">
-                              {isArenaFiltered
-                                ? formatPercentage(agent.arenaWinRate || 0)
-                                : formatPercentage(agent.win_rate)
-                              }
-                            </td>
-                            {(arenaFilter === 'overall' || arenaFilter === 'chess') && (
-                              <td className="px-6 py-3.5 text-center">
-                                <span className={`text-xs ${streak.color}`}>
-                                  {streak.icon} {streak.text}
+                                <td className="px-6 py-3.5">
+                                  <span className={`font-serif text-sm font-bold ${
+                                    index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-3.5">
+                                  <Link
+                                    href={`/agent/${agent.agent_id}`}
+                                    className="flex items-center gap-3 group"
+                                  >
+                                    <div className="avatar-ring w-7 h-7">
+                                      <img
+                                        src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                                        alt={agent.agent_name}
+                                        className="w-full h-full rounded-full"
+                                      />
+                                    </div>
+                                    <span className="font-medium text-brown/90 text-sm group-hover:text-bronze transition-colors">
+                                      {agent.agent_name}
+                                    </span>
+                                  </Link>
+                                </td>
+                                <td className="px-6 py-3.5 text-bronze/60 text-xs">{agent.model}</td>
+                                <td className="px-6 py-3.5 text-center">
+                                  <span className="text-gold font-serif font-bold text-sm">{agent.elo}</span>
+                                </td>
+                                <td className="px-6 py-3.5 text-center text-brown/70 text-xs font-mono">
+                                  {agent.wins}/{agent.losses}/{agent.draws}
+                                </td>
+                                <td className="px-6 py-3.5 text-center text-green-600/80 text-xs">
+                                  {formatPercentage(agent.win_rate)}
+                                </td>
+                                <td className="px-6 py-3.5 text-center">
+                                  <span className={`text-xs ${streak.color}`}>
+                                    {streak.icon} {streak.text}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rising Stars */}
+                {agents.filter(a => a.streak > 0).length > 0 && (
+                  <div className="card-stone p-6 animate-fade-in-up delay-500">
+                    <h3 className="section-heading text-sm text-bronze mb-6">Rising Stars</h3>
+                    <p className="text-bronze/60 text-[11px] mb-6">
+                      Agents with the hottest win streaks
+                    </p>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {agents
+                        .filter(agent => agent.streak > 0)
+                        .sort((a, b) => b.streak - a.streak)
+                        .slice(0, 4)
+                        .map((agent, i) => {
+                          const streak = getStreakDisplay(agent.streak);
+                          return (
+                            <Link
+                              key={agent.agent_id}
+                              href={`/agent/${agent.agent_id}`}
+                              className="text-center p-5 bg-sand-mid/30 border border-bronze/8 hover:border-bronze/20 hover:bg-sand-mid/50 transition-all group"
+                              style={{ animationDelay: `${i * 0.1}s`, borderRadius: '2px' }}
+                            >
+                              <div className="avatar-ring mx-auto w-12 h-12 mb-3">
+                                <img
+                                  src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                                  alt={agent.agent_name}
+                                  className="w-full h-full rounded-full"
+                                />
+                              </div>
+                              <p className="text-brown/90 text-sm font-medium group-hover:text-bronze transition-colors">{agent.agent_name}</p>
+                              <p className="text-gold text-xs font-serif font-bold mt-1">{agent.elo}</p>
+                              <p className={`text-xs mt-1 ${streak.color}`}>
+                                {streak.icon} {streak.text}
+                              </p>
+                            </Link>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ===== MODEL RANKINGS ===== */}
+            {activeTab === 'models' && (
+              <div className="space-y-10">
+                {/* Top 3 Models */}
+                <div className="grid md:grid-cols-3 gap-6 items-end">
+                  {filteredModels[1] && (
+                    <div className="animate-fade-in-up delay-200 order-1 md:order-1">
+                      <ModelPodiumCard model={filteredModels[1]} rank={2} />
+                    </div>
+                  )}
+                  {filteredModels[0] && (
+                    <div className="animate-fade-in-up delay-100 order-0 md:order-2">
+                      <ModelPodiumCard model={filteredModels[0]} rank={1} />
+                    </div>
+                  )}
+                  {filteredModels[2] && (
+                    <div className="animate-fade-in-up delay-300 order-2 md:order-3">
+                      <ModelPodiumCard model={filteredModels[2]} rank={3} />
+                    </div>
+                  )}
+                </div>
+
+                {filteredModels.length === 0 && (
+                  <div className="card-stone p-12 text-center animate-fade-in-up">
+                    <p className="text-bronze/70 font-serif italic">No model data available yet.</p>
+                  </div>
+                )}
+
+                {/* Model Rankings Table */}
+                {filteredModels.length > 0 && (
+                  <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
+                    <div className="px-6 py-4 border-b border-bronze/10">
+                      <h2 className="section-heading text-sm text-bronze">Model Performance</h2>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-bronze/10">
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Rank</th>
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Model</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Avg ELO</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Win Rate</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Agents</th>
+                            <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Matches</th>
+                            <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Best Agent</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredModels.map((model, index) => (
+                            <tr
+                              key={model.model}
+                              className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
+                            >
+                              <td className="px-6 py-3.5">
+                                <span className={`font-serif text-sm font-bold ${
+                                  index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
+                                }`}>
+                                  {model.rank}
                                 </span>
                               </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              <td className="px-6 py-3.5">
+                                <span className="font-medium text-brown/90 text-sm">{model.model}</span>
+                              </td>
+                              <td className="px-6 py-3.5 text-center">
+                                <span className="text-gold font-serif font-bold text-sm">{Math.round(model.avg_elo)}</span>
+                              </td>
+                              <td className="px-6 py-3.5 text-center text-green-600/80 text-xs">
+                                {formatPercentage(model.win_rate)}
+                              </td>
+                              <td className="px-6 py-3.5 text-center text-brown/70 text-xs">
+                                {model.agent_count}
+                              </td>
+                              <td className="px-6 py-3.5 text-center text-brown/70 text-xs">
+                                {model.total_matches}
+                              </td>
+                              <td className="px-6 py-3.5">
+                                {model.best_agent_name && (
+                                  <span className="text-gold text-xs">{model.best_agent_name}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Rising Stars (only for overall/chess) */}
-            {(arenaFilter === 'overall' || arenaFilter === 'chess') && (
-              <div className="card-stone p-6 animate-fade-in-up delay-500">
-                <h3 className="section-heading text-sm text-bronze mb-6">Rising Stars</h3>
-                <p className="text-bronze/60 text-[11px] mb-6">
-                  Agents with the hottest win streaks
-                </p>
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {agents
-                    .filter(agent => agent.streak > 0)
-                    .sort((a, b) => b.streak - a.streak)
-                    .slice(0, 4)
-                    .map((agent, i) => {
-                      const streak = getStreakDisplay(agent.streak);
-                      return (
-                        <Link
-                          key={agent.id}
-                          href={`/agent/${agent.id}`}
-                          className="text-center p-5 bg-sand-mid/30 border border-bronze/8 hover:border-bronze/20 hover:bg-sand-mid/50 transition-all group"
-                          style={{ animationDelay: `${i * 0.1}s`, borderRadius: '2px' }}
-                        >
-                          <div className="avatar-ring mx-auto w-12 h-12 mb-3">
-                            <img
-                              src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                              alt={agent.name}
-                              className="w-full h-full rounded-full"
-                            />
-                          </div>
-                          <p className="text-brown/90 text-sm font-medium group-hover:text-bronze transition-colors">{agent.name}</p>
-                          <p className="text-gold text-xs font-serif font-bold mt-1">{agent.elo}</p>
-                          <p className={`text-xs mt-1 ${streak.color}`}>
-                            {streak.icon} {streak.text}
-                          </p>
-                        </Link>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ===== MODEL RANKINGS ===== */}
-        {activeTab === 'models' && (
-          <div className="space-y-10">
-            {/* Top 3 Models */}
-            <div className="grid md:grid-cols-3 gap-6 items-end">
-              {filteredModels[1] && (
-                <div className="animate-fade-in-up delay-200 order-1 md:order-1">
-                  <ModelPodiumCard model={filteredModels[1]} rank={2} />
-                </div>
-              )}
-              {filteredModels[0] && (
-                <div className="animate-fade-in-up delay-100 order-0 md:order-2">
-                  <ModelPodiumCard model={filteredModels[0]} rank={1} />
-                </div>
-              )}
-              {filteredModels[2] && (
-                <div className="animate-fade-in-up delay-300 order-2 md:order-3">
-                  <ModelPodiumCard model={filteredModels[2]} rank={3} />
-                </div>
-              )}
-            </div>
-
-            {/* Model Rankings Table */}
-            <div className="card-stone overflow-hidden animate-fade-in-up delay-400">
-              <div className="px-6 py-4 border-b border-bronze/10">
-                <h2 className="section-heading text-sm text-bronze">Model Performance</h2>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-bronze/10">
-                      <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Rank</th>
-                      <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Model</th>
-                      <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Avg ELO</th>
-                      <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Win Rate</th>
-                      <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Agents</th>
-                      <th className="px-6 py-3 text-center text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Matches</th>
-                      <th className="px-6 py-3 text-left text-[9px] text-bronze/60 uppercase tracking-[0.15em] font-serif">Best Agent</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredModels.map((model, index) => (
-                      <tr
-                        key={model.model}
-                        className={`tablet-row ${index < 3 ? 'tablet-row-top' : ''}`}
-                      >
-                        <td className="px-6 py-3.5">
-                          <span className={`font-serif text-sm font-bold ${
-                            index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
-                          }`}>
-                            {model.rank}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <span className="font-medium text-brown/90 text-sm">{model.model}</span>
-                        </td>
-                        <td className="px-6 py-3.5 text-center">
-                          <span className="text-gold font-serif font-bold text-sm">{Math.round(model.avg_elo)}</span>
-                        </td>
-                        <td className="px-6 py-3.5 text-center text-green-600/80 text-xs">
-                          {formatPercentage(model.win_rate)}
-                        </td>
-                        <td className="px-6 py-3.5 text-center text-brown/70 text-xs">
-                          {model.agent_count}
-                        </td>
-                        <td className="px-6 py-3.5 text-center text-brown/70 text-xs">
-                          {model.total_matches}
-                        </td>
-                        <td className="px-6 py-3.5">
-                          {model.best_agent_name && (
-                            <span className="text-gold text-xs">{model.best_agent_name}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </Layout>
@@ -447,27 +514,15 @@ function LeaderboardContent() {
 }
 
 /* ===== PODIUM CARD COMPONENT ===== */
-import { AgentWithStats, ModelRanking, ArenaType as AT } from '@/types/database';
-
-function PodiumCard({
-  agent,
-  rank,
-  arenaFilter
-}: {
-  agent: AgentWithStats & { arenaWins?: number; arenaLosses?: number; arenaTotal?: number; arenaWinRate?: number };
-  rank: number;
-  arenaFilter: 'overall' | AT;
-}) {
+function PodiumCard({ agent, rank }: { agent: DbLeaderboardRow; rank: number }) {
   const streak = getStreakDisplay(agent.streak);
   const podiumClass = rank === 1 ? 'podium-first' : rank === 2 ? 'podium-second' : 'podium-third';
-  const isArenaFiltered = arenaFilter === 'roast' || arenaFilter === 'hottake';
 
   return (
     <Link
-      href={`/agent/${agent.id}`}
+      href={`/agent/${agent.agent_id}`}
       className={`block p-6 text-center card-glow ${podiumClass} ${rank === 1 ? 'md:pb-10' : ''}`}
     >
-      {/* Rank numeral */}
       <div className={`font-serif font-black text-4xl mb-4 ${
         rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze'
       }`}>
@@ -477,13 +532,13 @@ function PodiumCard({
       <div className={`avatar-ring mx-auto ${rank === 1 ? 'w-24 h-24' : 'w-18 h-18'} mb-4`}>
         <img
           src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-          alt={agent.name}
+          alt={agent.agent_name}
           className="w-full h-full rounded-full"
         />
       </div>
 
       <h3 className={`font-serif font-bold text-brown mb-1 ${rank === 1 ? 'text-xl' : 'text-base'}`}>
-        {agent.name}
+        {agent.agent_name}
       </h3>
       <p className="text-bronze/60 text-[10px] mb-3">{agent.model}</p>
 
@@ -497,22 +552,14 @@ function PodiumCard({
       <div className="divider-gold my-4" />
 
       <div className="text-xs text-bronze/60">
-        {isArenaFiltered
-          ? `${agent.arenaWins}W · ${agent.arenaLosses}L`
-          : `${agent.wins}W · ${agent.losses}L · ${agent.draws}D`
-        }
+        {agent.wins}W &middot; {agent.losses}L &middot; {agent.draws}D
       </div>
       <div className="text-xs text-bronze/60 mt-0.5">
-        {isArenaFiltered
-          ? `${formatPercentage(agent.arenaWinRate || 0)} win rate`
-          : `${formatPercentage(agent.win_rate)} win rate`
-        }
+        {formatPercentage(agent.win_rate)} win rate
       </div>
-      {!isArenaFiltered && (
-        <div className={`text-xs mt-2 ${streak.color}`}>
-          {streak.icon} {streak.text}
-        </div>
-      )}
+      <div className={`text-xs mt-2 ${streak.color}`}>
+        {streak.icon} {streak.text}
+      </div>
     </Link>
   );
 }

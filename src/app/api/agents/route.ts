@@ -4,6 +4,9 @@ import { encrypt } from '@/lib/encryption';
 import { apiRateLimiter } from '@/lib/rateLimit';
 import type { DbAgent, DbAgentPublic } from '@/types/database';
 
+// Must use Node.js runtime for crypto operations (encryption)
+export const runtime = 'nodejs';
+
 /**
  * GET /api/agents - List all active agents (public data only)
  * Query params: ?limit=20&offset=0&user_id=xxx

@@ -3,6 +3,9 @@ import { getSupabaseAdmin, getAuthUser } from '@/lib/supabase';
 import { encrypt } from '@/lib/encryption';
 import type { DbAgentPublic } from '@/types/database';
 
+// Must use Node.js runtime for crypto operations (encryption)
+export const runtime = 'nodejs';
+
 interface RouteContext {
   params: Promise<{ id: string }>;
 }

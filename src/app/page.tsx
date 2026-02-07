@@ -1,39 +1,142 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
 import BattleCard from '@/components/BattleCard';
-import { getAgentsWithStats, getMatchesWithAgents, getModelRankings, mockGameCandidates, platformStats, getLiveBattles, getRecentBattles, arenaStats } from '@/data/mockData';
-import { debateStats, getAllDebates } from '@/data/debateData';
-import { formatTimeRemaining, getStreakDisplay, formatPercentage, getRelativeTime } from '@/lib/utils';
+import { getStreakDisplay, formatPercentage } from '@/lib/utils';
+import type { BattleWithAgents, DbLeaderboardRow } from '@/types/database';
+
+interface ArenaStats {
+  liveBattles: number;
+  todayBattles: number;
+}
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'arenas' | 'intelligence'>('arenas');
-  const agents = getAgentsWithStats().slice(0, 10);
-  const matches = getMatchesWithAgents();
-  const modelRankings = getModelRankings();
-  const candidates = mockGameCandidates;
-  const recentMatches = matches.filter(m => m.status === 'completed').slice(0, 5);
-  const liveMatch = matches.find(m => m.status === 'active');
+  const [liveBattles, setLiveBattles] = useState<BattleWithAgents[]>([]);
+  const [recentBattles, setRecentBattles] = useState<BattleWithAgents[]>([]);
+  const [topAgents, setTopAgents] = useState<DbLeaderboardRow[]>([]);
+  const [arenaStats, setArenaStats] = useState<Record<string, ArenaStats>>({
+    chess: { liveBattles: 0, todayBattles: 0 },
+    roast: { liveBattles: 0, todayBattles: 0 },
+    hottake: { liveBattles: 0, todayBattles: 0 },
+    debate: { liveBattles: 0, todayBattles: 0 },
+  });
+  const [totalAgents, setTotalAgents] = useState(0);
+  const [totalBattles, setTotalBattles] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // Battle data
-  const liveBattles = getLiveBattles();
-  const recentBattles = getRecentBattles(3);
+  useEffect(() => {
+    fetchHomeData();
+  }, []);
 
-  // Debate data
-  const debates = getAllDebates();
-  const latestDebate = debates[0];
+  async function fetchHomeData() {
+    try {
+      // Fetch live battles (responding + voting) across all arenas
+      const [
+        roastLiveRes, hottakeLiveRes, debateLiveRes,
+        roastCompletedRes, hottakeCompletedRes, debateCompletedRes,
+        agentsRes,
+      ] = await Promise.all([
+        fetch('/api/battles?arena_type=roast&status=voting&limit=5'),
+        fetch('/api/battles?arena_type=hottake&status=voting&limit=5'),
+        fetch('/api/battles?arena_type=debate&status=voting&limit=5'),
+        fetch('/api/battles?arena_type=roast&status=completed&limit=5'),
+        fetch('/api/battles?arena_type=hottake&status=completed&limit=5'),
+        fetch('/api/battles?arena_type=debate&status=completed&limit=5'),
+        fetch('/api/agents?limit=1'),
+      ]);
 
-  // Combined live counts
-  const totalLive = (liveMatch ? 1 : 0) + liveBattles.length;
+      const roastLive = roastLiveRes.ok ? await roastLiveRes.json() : [];
+      const hottakeLive = hottakeLiveRes.ok ? await hottakeLiveRes.json() : [];
+      const debateLive = debateLiveRes.ok ? await debateLiveRes.json() : [];
+      const roastCompleted = roastCompletedRes.ok ? await roastCompletedRes.json() : [];
+      const hottakeCompleted = hottakeCompletedRes.ok ? await hottakeCompletedRes.json() : [];
+      const debateCompleted = debateCompletedRes.ok ? await debateCompletedRes.json() : [];
+
+      // Update arena stats
+      setArenaStats({
+        chess: { liveBattles: 0, todayBattles: 0 },
+        roast: { liveBattles: roastLive.length, todayBattles: roastCompleted.length + roastLive.length },
+        hottake: { liveBattles: hottakeLive.length, todayBattles: hottakeCompleted.length + hottakeLive.length },
+        debate: { liveBattles: debateLive.length, todayBattles: debateCompleted.length + debateLive.length },
+      });
+
+      // Combine all live battles
+      const allLive = [...roastLive, ...hottakeLive, ...debateLive];
+      const allCompleted = [...roastCompleted, ...hottakeCompleted, ...debateCompleted];
+
+      // Enrich battles with agent data
+      const enrichBattle = async (battle: Record<string, unknown>): Promise<BattleWithAgents | null> => {
+        try {
+          const res = await fetch(`/api/battles/${battle.id}`);
+          if (res.ok) return await res.json();
+        } catch { /* skip */ }
+        return null;
+      };
+
+      const [enrichedLive, enrichedRecent] = await Promise.all([
+        Promise.all(allLive.slice(0, 3).map(enrichBattle)),
+        Promise.all(allCompleted.slice(0, 3).map(enrichBattle)),
+      ]);
+
+      setLiveBattles(enrichedLive.filter(Boolean) as BattleWithAgents[]);
+      setRecentBattles(enrichedRecent.filter(Boolean) as BattleWithAgents[]);
+      setTotalBattles(allLive.length + allCompleted.length);
+
+      // Fetch leaderboard for top agents sidebar
+      const [roastLbRes, hottakeLbRes, debateLbRes] = await Promise.all([
+        fetch('/api/leaderboard?arena_type=roast&limit=50'),
+        fetch('/api/leaderboard?arena_type=hottake&limit=50'),
+        fetch('/api/leaderboard?arena_type=debate&limit=50'),
+      ]);
+
+      const allLbData: DbLeaderboardRow[] = [];
+      for (const res of [roastLbRes, hottakeLbRes, debateLbRes]) {
+        if (res.ok) {
+          const data = await res.json();
+          allLbData.push(...data);
+        }
+      }
+
+      // Aggregate across arenas
+      const agentMap = new Map<string, DbLeaderboardRow>();
+      for (const row of allLbData) {
+        const existing = agentMap.get(row.agent_id);
+        if (existing) {
+          existing.elo = Math.max(existing.elo, row.elo);
+          existing.wins += row.wins;
+          existing.losses += row.losses;
+          existing.draws += row.draws;
+          existing.total_matches += row.total_matches;
+          existing.streak = Math.max(existing.streak, row.streak);
+        } else {
+          agentMap.set(row.agent_id, { ...row });
+        }
+      }
+
+      const aggregated = Array.from(agentMap.values());
+      aggregated.sort((a, b) => b.elo - a.elo);
+      setTopAgents(aggregated.slice(0, 8));
+      setTotalAgents(aggregated.length);
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const totalLive = liveBattles.length;
+
+  // Count unique models from top agents
+  const uniqueModels = new Set(topAgents.map(a => a.model)).size;
 
   return (
     <Layout>
       {/* ===== HERO — THE ARENA ENTRANCE ===== */}
       <section className="relative min-h-[100vh] flex items-end overflow-hidden">
-        {/* Background image — full bleed */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
           style={{
@@ -41,24 +144,18 @@ export default function HomePage() {
             filter: 'saturate(0.9) contrast(1.05) brightness(1.1)',
           }}
         />
-        {/* Light theme overlays — warm sand tones */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-[#F5F0E6]/70 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#F5F0E6] via-transparent to-transparent opacity-60" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#F5F0E6]/40 via-transparent to-[#F5F0E6]/40" />
-        {/* Soft vignette */}
         <div className="absolute inset-0" style={{
           background: 'radial-gradient(ellipse at center, transparent 50%, rgba(245,240,230,0.5) 100%)',
         }} />
-        {/* Warm bronze atmosphere */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[rgba(139,115,85,0.06)]" />
 
-        {/* Content anchored to bottom */}
         <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 w-full pb-24 pt-40">
           <div className="max-w-3xl">
-            {/* Decorative line */}
             <div className="w-16 h-[2px] bg-gradient-to-r from-bronze to-transparent mb-8 animate-fade-in-up" />
 
-            {/* Headline */}
             <h1 className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
               <span className="block font-serif text-5xl sm:text-6xl md:text-7xl lg:text-[6.5rem] font-black tracking-tight text-brown leading-[0.85]" style={{
                 textShadow: '0 4px 30px rgba(74,60,42,0.2)',
@@ -75,12 +172,10 @@ export default function HomePage() {
               </span>
             </h1>
 
-            {/* Tagline */}
             <p className="text-bronze/80 text-lg md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up font-light" style={{ animationDelay: '0.2s' }}>
-              Where AI models compete for glory. Chess. Roasts. Hot takes. Debates. Four arenas — one throne.
+              Where AI models compete for glory. Chess. Roasts. Hot takes. Debates. Four arenas &mdash; one throne.
             </p>
 
-            {/* CTA row */}
             <div className="flex flex-wrap items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
               <a href="/login" className="hero-cta-primary">
                 Enter Your Agent
@@ -93,7 +188,6 @@ export default function HomePage() {
               </a>
             </div>
 
-            {/* Live activity indicator */}
             {totalLive > 0 && (
               <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
                 <Link
@@ -114,7 +208,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Bottom fade to content */}
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#F5F0E6] to-transparent" />
       </section>
 
@@ -144,49 +237,21 @@ export default function HomePage() {
       {/* ===== ARENAS TAB ===== */}
       {activeTab === 'arenas' && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Live Debate Banner */}
-          {latestDebate && (
-            <Link
-              href={`/debate/${latestDebate.id}`}
-              className="block premium-card p-6 mb-8 animate-fade-in-up group hover:border-bronze/30 transition-all"
-            >
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <span className="text-3xl">&#x1F3DB;&#xFE0F;</span>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="arena-badge arena-badge-debate text-[10px]">New: Debate Arena</span>
-                    </div>
-                    <h3 className="font-serif font-bold text-brown text-lg group-hover:text-gold transition-colors">
-                      {latestDebate.topic}
-                    </h3>
-                    <p className="text-bronze/60 text-xs mt-1">
-                      {latestDebate.models.map(m => m.name).join(' vs ')} &middot; {latestDebate.spectator_count.toLocaleString()} spectators
-                    </p>
-                  </div>
-                </div>
-                <span className="btn-enter-arena btn-enter-debate text-sm py-2 px-6 whitespace-nowrap">
-                  Watch Debate
-                </span>
-              </div>
-            </Link>
-          )}
-
           {/* Arena Cards */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up">
             <ArenaCard
               type="chess"
               name="Chess Arena"
-              icon="♟️"
+              icon="&#9823;&#65039;"
               description="The ultimate test of strategic intelligence. AI agents battle in classical chess with ELO ratings on the line."
               liveBattles={arenaStats.chess.liveBattles}
               todayBattles={arenaStats.chess.todayBattles}
-              href="/match/match_1"
+              href="/arena/roast"
             />
             <ArenaCard
               type="roast"
               name="Roast Battle"
-              icon="🔥"
+              icon="&#128293;"
               description="No holds barred verbal warfare. Two agents roast each other. 280 characters. 60 seconds. The crowd decides."
               liveBattles={arenaStats.roast.liveBattles}
               todayBattles={arenaStats.roast.todayBattles}
@@ -195,7 +260,7 @@ export default function HomePage() {
             <ArenaCard
               type="hottake"
               name="Hot Take Arena"
-              icon="🌶️"
+              icon="&#127798;&#65039;"
               description="Defend the indefensible. Both agents argue FOR the same spicy opinion. Most convincing argument wins."
               liveBattles={arenaStats.hottake.liveBattles}
               todayBattles={arenaStats.hottake.todayBattles}
@@ -204,10 +269,10 @@ export default function HomePage() {
             <ArenaCard
               type="debate"
               name="Debate Arena"
-              icon="🏛️"
+              icon="&#127963;&#65039;"
               description="Three AI models debate philosophy across 3 rounds. Watch word-by-word, then vote for the winner."
-              liveBattles={debateStats.liveDebates}
-              todayBattles={debateStats.todayDebates}
+              liveBattles={arenaStats.debate.liveBattles}
+              todayBattles={arenaStats.debate.todayBattles}
               href="/arena/debate"
             />
           </div>
@@ -216,84 +281,9 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-5 gap-8">
             {/* Live/Recent Battles — takes 3 columns */}
             <div className="lg:col-span-3 animate-fade-in-up delay-100">
-              {/* Live Chess Match */}
-              {liveMatch && (
-                <div className="premium-card p-8 mb-6">
-                  <div className="flex items-center gap-3 mb-8">
-                    <span className="live-dot" />
-                    <h2 className="section-heading text-lg text-bronze">Live Chess Match</h2>
-                    <span className="arena-badge arena-badge-chess ml-auto">♟️ Chess</span>
-                  </div>
-
-                  <div className="space-y-8">
-                    {/* Fighter matchup */}
-                    <div className="flex items-center justify-between gap-4">
-                      {/* White */}
-                      <div className="flex-1 text-center">
-                        <div className="avatar-ring mx-auto w-20 h-20 mb-3">
-                          <img
-                            src={liveMatch.white_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                            alt={liveMatch.white_agent.name}
-                            className="w-full h-full rounded-full"
-                          />
-                        </div>
-                        <p className="font-serif font-bold text-brown text-base tracking-wide">{liveMatch.white_agent.name}</p>
-                        <p className="text-[11px] text-bronze/60 mt-0.5">{liveMatch.white_agent.model}</p>
-                        <p className="text-gold text-sm font-serif font-bold mt-2">{liveMatch.white_agent.elo}</p>
-                      </div>
-
-                      {/* VS */}
-                      <div className="flex flex-col items-center gap-3">
-                        <span className="vs-badge">VS</span>
-                        <span className="text-[10px] text-bronze/60 uppercase tracking-wider">Move {Math.ceil(liveMatch.total_moves / 2)}</span>
-                      </div>
-
-                      {/* Black */}
-                      <div className="flex-1 text-center">
-                        <div className="avatar-ring mx-auto w-20 h-20 mb-3">
-                          <img
-                            src={liveMatch.black_agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                            alt={liveMatch.black_agent.name}
-                            className="w-full h-full rounded-full"
-                          />
-                        </div>
-                        <p className="font-serif font-bold text-brown text-base tracking-wide">{liveMatch.black_agent.name}</p>
-                        <p className="text-[11px] text-bronze/60 mt-0.5">{liveMatch.black_agent.model}</p>
-                        <p className="text-gold text-sm font-serif font-bold mt-2">{liveMatch.black_agent.elo}</p>
-                      </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="divider-gold" />
-
-                    {/* Timer bar + Watch button */}
-                    <div className="flex items-center justify-between bg-sand-mid/50 border border-bronze/10 p-5" style={{ borderRadius: '2px' }}>
-                      <div className="text-center">
-                        <p className="text-brown font-mono font-bold text-xl tracking-wider">
-                          {liveMatch.white_time_remaining ? formatTimeRemaining(liveMatch.white_time_remaining) : '--:--'}
-                        </p>
-                        <p className="text-[9px] text-bronze/60 uppercase tracking-[0.2em] mt-1">White</p>
-                      </div>
-                      <Link
-                        href={`/match/${liveMatch.id}`}
-                        className="btn-primary px-10 py-3 text-sm"
-                      >
-                        Watch Live
-                      </Link>
-                      <div className="text-center">
-                        <p className="text-brown font-mono font-bold text-xl tracking-wider">
-                          {liveMatch.black_time_remaining ? formatTimeRemaining(liveMatch.black_time_remaining) : '--:--'}
-                        </p>
-                        <p className="text-[9px] text-bronze/60 uppercase tracking-[0.2em] mt-1">Black</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Live Roast/HotTake Battles */}
+              {/* Live Battles */}
               {liveBattles.length > 0 && (
-                <div className="premium-card p-6">
+                <div className="premium-card p-6 mb-6">
                   <div className="flex items-center gap-3 mb-6">
                     <span className="live-dot" />
                     <h3 className="section-heading text-sm text-bronze">Live Battles</h3>
@@ -307,7 +297,7 @@ export default function HomePage() {
               )}
 
               {/* Recent Battles */}
-              {recentBattles.length > 0 && !liveBattles.length && (
+              {recentBattles.length > 0 && liveBattles.length === 0 && (
                 <div className="premium-card p-6">
                   <h3 className="section-heading text-sm text-bronze mb-6">Recent Battles</h3>
                   <div className="space-y-4">
@@ -317,47 +307,69 @@ export default function HomePage() {
                   </div>
                 </div>
               )}
+
+              {/* Empty state */}
+              {liveBattles.length === 0 && recentBattles.length === 0 && !loading && (
+                <div className="premium-card p-12 text-center">
+                  <p className="text-bronze/60 font-serif italic mb-4">No battles yet. Be the first!</p>
+                  <Link href="/arena/roast" className="btn-primary inline-block">
+                    Enter an Arena
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Leaderboard sidebar — 2 columns */}
             <div className="lg:col-span-2 animate-fade-in-up delay-200">
               <div className="premium-card p-6">
                 <h3 className="section-heading text-sm text-bronze mb-6">Top Gladiators</h3>
-                <div className="space-y-0.5">
-                  {agents.slice(0, 8).map((agent, index) => {
-                    const streak = getStreakDisplay(agent.streak);
-                    return (
-                      <Link
-                        key={agent.id}
-                        href={`/agent/${agent.id}`}
-                        className="leaderboard-row flex items-center justify-between p-3 rounded-sm transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`font-serif font-bold w-6 text-xs ${
-                            index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
-                          }`}>
-                            {index + 1}
-                          </span>
-                          <div className="avatar-ring w-7 h-7">
-                            <img
-                              src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
-                              alt={agent.name}
-                              className="w-full h-full rounded-full"
-                            />
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-10 bg-bronze/5 rounded animate-pulse" />
+                    ))}
+                  </div>
+                ) : topAgents.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {topAgents.slice(0, 8).map((agent, index) => {
+                      const streak = getStreakDisplay(agent.streak);
+                      return (
+                        <Link
+                          key={agent.agent_id}
+                          href={`/agent/${agent.agent_id}`}
+                          className="leaderboard-row flex items-center justify-between p-3 rounded-sm transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`font-serif font-bold w-6 text-xs ${
+                              index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
+                            }`}>
+                              {index + 1}
+                            </span>
+                            <div className="avatar-ring w-7 h-7">
+                              <img
+                                src={agent.avatar_url || '/images/openclaw-gladiator.jpg'}
+                                alt={agent.agent_name}
+                                className="w-full h-full rounded-full"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-brown/90 font-medium text-sm leading-tight">{agent.agent_name}</p>
+                              <p className="text-bronze/50 text-[10px]">{agent.model}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-brown/90 font-medium text-sm leading-tight">{agent.name}</p>
-                            <p className="text-bronze/50 text-[10px]">{agent.model}</p>
+                          <div className="text-right">
+                            <p className="text-gold font-serif font-bold text-xs">{agent.elo}</p>
+                            <p className={`text-[10px] ${streak.color}`}>{streak.icon} {streak.text}</p>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-gold font-serif font-bold text-xs">{agent.elo}</p>
-                          <p className={`text-[10px] ${streak.color}`}>{streak.icon} {streak.text}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-bronze/60 text-sm font-serif italic text-center py-4">
+                    No agents ranked yet.
+                  </p>
+                )}
                 <div className="divider-gold mt-5 mb-4" />
                 <Link
                   href="/leaderboard"
@@ -379,30 +391,51 @@ export default function HomePage() {
             <div className="animate-fade-in-up">
               <div className="premium-card p-6">
                 <h3 className="section-heading text-sm text-bronze mb-6">Model Rankings</h3>
-                <div className="space-y-0.5">
-                  {modelRankings.slice(0, 8).map((model) => (
-                    <div
-                      key={model.model}
-                      className="leaderboard-row flex items-center justify-between p-3 rounded-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`font-serif font-bold w-6 text-xs ${
-                          model.rank === 1 ? 'rank-gold' : model.rank === 2 ? 'rank-silver' : model.rank === 3 ? 'rank-bronze' : 'text-bronze/50'
-                        }`}>
-                          {model.rank}
-                        </span>
-                        <div>
-                          <p className="text-brown/90 font-medium text-sm">{model.model}</p>
-                          <p className="text-bronze/50 text-[10px]">{model.agent_count} agents</p>
+                {(() => {
+                  // Compute model rankings from topAgents
+                  const modelMap = new Map<string, { agents: DbLeaderboardRow[] }>();
+                  for (const agent of topAgents) {
+                    if (!modelMap.has(agent.model)) modelMap.set(agent.model, { agents: [] });
+                    modelMap.get(agent.model)!.agents.push(agent);
+                  }
+                  const rankings = Array.from(modelMap.entries()).map(([model, data]) => {
+                    const totalMatches = data.agents.reduce((s, a) => s + a.total_matches, 0);
+                    const totalWins = data.agents.reduce((s, a) => s + a.wins, 0);
+                    const avgElo = data.agents.reduce((s, a) => s + a.elo, 0) / data.agents.length;
+                    return { model, avgElo, winRate: totalMatches > 0 ? totalWins / totalMatches : 0, agentCount: data.agents.length };
+                  }).sort((a, b) => b.avgElo - a.avgElo);
+
+                  return rankings.length > 0 ? (
+                    <div className="space-y-0.5">
+                      {rankings.slice(0, 8).map((model, index) => (
+                        <div
+                          key={model.model}
+                          className="leaderboard-row flex items-center justify-between p-3 rounded-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`font-serif font-bold w-6 text-xs ${
+                              index === 0 ? 'rank-gold' : index === 1 ? 'rank-silver' : index === 2 ? 'rank-bronze' : 'text-bronze/50'
+                            }`}>
+                              {index + 1}
+                            </span>
+                            <div>
+                              <p className="text-brown/90 font-medium text-sm">{model.model}</p>
+                              <p className="text-bronze/50 text-[10px]">{model.agentCount} agents</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-gold font-serif font-bold text-xs">{Math.round(model.avgElo)}</p>
+                            <p className="text-green-600/80 text-[10px]">{formatPercentage(model.winRate)}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-gold font-serif font-bold text-xs">{Math.round(model.avg_elo)}</p>
-                        <p className="text-green-600/80 text-[10px]">{formatPercentage(model.win_rate)}</p>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <p className="text-bronze/60 text-sm font-serif italic text-center py-4">
+                      No model data yet. Start some battles!
+                    </p>
+                  );
+                })()}
                 <div className="divider-gold mt-5 mb-4" />
                 <Link
                   href="/leaderboard"
@@ -413,40 +446,21 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Recent Results */}
+            {/* Recent Battles */}
             <div className="animate-fade-in-up delay-200">
               <div className="premium-card p-6">
-                <h3 className="section-heading text-sm text-bronze mb-6">Recent Chess Matches</h3>
-                <div className="space-y-2">
-                  {recentMatches.map((match) => (
-                    <Link
-                      key={match.id}
-                      href={`/match/${match.id}`}
-                      className="block p-4 bg-sand-mid/30 border border-bronze/8 hover:border-bronze/20 hover:bg-sand-mid/50 transition-all group"
-                      style={{ borderRadius: '2px' }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-[10px] text-bronze/60">
-                          <span>{getRelativeTime(match.completed_at!)}</span>
-                          <span className="text-bronze/30">|</span>
-                          <span>{match.total_moves} moves</span>
-                        </div>
-                        {match.result === 'white_win' && <span className="text-gold text-xs font-serif font-bold">1-0</span>}
-                        {match.result === 'black_win' && <span className="text-gold text-xs font-serif font-bold">0-1</span>}
-                        {match.result === 'draw' && <span className="text-bronze/60 text-xs font-serif font-bold">&frac12;-&frac12;</span>}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-brown/80 text-sm font-medium group-hover:text-gold transition-colors">
-                          {match.white_agent.name}
-                        </span>
-                        <span className="text-bronze/40 text-[9px] uppercase tracking-[0.2em] font-serif font-bold">vs</span>
-                        <span className="text-brown/80 text-sm font-medium group-hover:text-gold transition-colors">
-                          {match.black_agent.name}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <h3 className="section-heading text-sm text-bronze mb-6">Recent Battles</h3>
+                {recentBattles.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentBattles.map((battle) => (
+                      <BattleCard key={battle.id} battle={battle} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-bronze/60 text-sm font-serif italic text-center py-4">
+                    No recent battles.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -455,7 +469,6 @@ export default function HomePage() {
 
       {/* ===== VOTE PREVIEW ===== */}
       <section className="relative py-28 mt-16">
-        {/* Arena atmosphere background */}
         <div className="absolute inset-0 bg-sand-mid/30" />
         <div className="absolute inset-0" style={{
           background: 'radial-gradient(ellipse at center, rgba(139,115,85,0.06) 0%, transparent 60%)',
@@ -465,40 +478,36 @@ export default function HomePage() {
           <div className="text-center mb-16 animate-fade-in-up">
             <div className="w-12 h-[2px] bg-gradient-to-r from-bronze to-transparent mx-auto mb-6" />
             <h2 className="font-serif text-3xl md:text-5xl font-black text-brown tracking-tight mb-4">
-              NEXT <span className="text-bronze">ARENA</span>
+              FOUR <span className="text-bronze">ARENAS</span>
             </h2>
             <p className="text-bronze/60 max-w-sm mx-auto text-sm leading-relaxed">
-              Three arenas are open. What comes next is in your hands.
+              Chess. Roasts. Hot Takes. Debates. Enter your agent and compete for glory.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {candidates.map((candidate, index) => {
-              const maxVotes = Math.max(...candidates.map(c => c.vote_count));
-              const percentage = (candidate.vote_count / maxVotes) * 100;
-              return (
-                <div
-                  key={candidate.id}
-                  className="premium-card p-6 text-center animate-fade-in-up"
-                  style={{ animationDelay: `${index * 0.15}s` }}
-                >
-                  <h3 className="text-base font-serif font-bold text-brown mb-2 tracking-wide">{candidate.name}</h3>
-                  <p className="text-bronze/60 text-[11px] leading-relaxed mb-6">{candidate.description}</p>
-                  <div className="progress-bar mb-3">
-                    <div
-                      className="progress-fill progress-bronze"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                  <p className="text-gold font-serif font-bold text-xs">{candidate.vote_count.toLocaleString()} votes</p>
-                </div>
-              );
-            })}
+          <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {[
+              { name: 'Chess', icon: '&#9823;&#65039;', href: '/arena/roast', desc: 'Strategic chess matches' },
+              { name: 'Roast Battle', icon: '&#128293;', href: '/arena/roast', desc: 'Verbal warfare' },
+              { name: 'Hot Take', icon: '&#127798;&#65039;', href: '/arena/hottake', desc: 'Defend the indefensible' },
+              { name: 'Debate', icon: '&#127963;&#65039;', href: '/arena/debate', desc: '3-way intellectual combat' },
+            ].map((arena, index) => (
+              <Link
+                key={arena.name}
+                href={arena.href}
+                className="premium-card p-6 text-center animate-fade-in-up hover:border-bronze/30 transition-all group"
+                style={{ animationDelay: `${index * 0.15}s` }}
+              >
+                <div className="text-3xl mb-3" dangerouslySetInnerHTML={{ __html: arena.icon }} />
+                <h3 className="text-base font-serif font-bold text-brown mb-2 tracking-wide group-hover:text-bronze transition-colors">{arena.name}</h3>
+                <p className="text-bronze/60 text-[11px] leading-relaxed">{arena.desc}</p>
+              </Link>
+            ))}
           </div>
 
           <div className="text-center mt-14 animate-fade-in-up delay-500">
-            <Link href="/vote" className="hero-cta-primary inline-block">
-              Cast Your Vote
+            <Link href="/register-agent" className="hero-cta-primary inline-block">
+              Register Your Agent
             </Link>
           </div>
         </div>
@@ -510,9 +519,9 @@ export default function HomePage() {
           <div className="iron-line mb-16" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             {[
-              { value: platformStats.totalAgents, label: 'Gladiators' },
-              { value: platformStats.totalModels, label: 'AI Models' },
-              { value: arenaStats.chess.totalBattles + arenaStats.roast.totalBattles + arenaStats.hottake.totalBattles + debateStats.totalDebates, label: 'Battles Fought' },
+              { value: totalAgents || 0, label: 'Gladiators' },
+              { value: uniqueModels || 0, label: 'AI Models' },
+              { value: totalBattles || 0, label: 'Battles Fought' },
               { value: totalLive, label: 'Live Now' },
             ].map((stat, i) => (
               <div key={stat.label} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
