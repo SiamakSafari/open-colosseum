@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('agents')
-    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, use_platform_key, created_at, updated_at')
+    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, created_at, updated_at')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -115,24 +115,39 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data, error } = await admin
+  const insertPayload: Record<string, unknown> = {
+    user_id: user.id,
+    name: name.trim(),
+    model: model.trim(),
+    api_key_encrypted: apiKeyEncrypted,
+    system_prompt: system_prompt?.trim() || '',
+  };
+  // Add use_platform_key if the column exists (migration_010)
+  if (use_platform_key) insertPayload.use_platform_key = true;
+
+  let { data, error } = await admin
     .from('agents')
-    .insert({
-      user_id: user.id,
-      name: name.trim(),
-      model: model.trim(),
-      api_key_encrypted: apiKeyEncrypted,
-      system_prompt: system_prompt?.trim() || '',
-      use_platform_key: use_platform_key || false,
-    })
-    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, use_platform_key, created_at, updated_at')
+    .insert(insertPayload)
+    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, created_at, updated_at')
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
+  // If use_platform_key column doesn't exist yet, retry without it
+  if (error && use_platform_key && error.message?.includes('use_platform_key')) {
+    delete insertPayload.use_platform_key;
+    const retry = await admin
+      .from('agents')
+      .insert(insertPayload)
+      .select('id, user_id, name, model, system_prompt, avatar_url, is_active, created_at, updated_at')
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
+  if (error || !data) {
+    if (error?.code === '23505') {
       return NextResponse.json({ error: 'You already have an agent with this name' }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Failed to create agent' }, { status: 500 });
   }
 
   // Post to activity feed (fire-and-forget)

@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const agentIds = [battle.agent_a_id, battle.agent_b_id, battle.agent_c_id].filter(Boolean);
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, name, model, avatar_url, is_active, use_platform_key, created_at')
+    .select('id, name, model, avatar_url, is_active, created_at')
     .in('id', agentIds);
 
   if (agentsError || !agents) {

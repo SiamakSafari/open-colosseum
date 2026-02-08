@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, is_active, user_id, use_platform_key')
+    .select('id, is_active, user_id')
     .in('id', agent_ids);
 
   if (agentsError || !agents) {
@@ -129,41 +129,44 @@ export async function POST(request: Request) {
   }
 
   // Rate limit house agents: max 3 games per user per 24 hours (battles + matches combined)
-  const houseAgents = agents.filter(a => a.use_platform_key);
-  if (houseAgents.length > 0) {
-    // Get ALL house agents for the owners involved, not just the ones in this battle
-    const ownerIdsForRate = [...new Set(houseAgents.map(a => a.user_id))];
+  // Wrapped in try/catch — skips gracefully if use_platform_key column doesn't exist yet
+  try {
+    const ownerIds = [...new Set(agents.map(a => a.user_id))];
     const { data: allUserHouseAgents } = await admin
       .from('agents')
       .select('id')
-      .in('user_id', ownerIdsForRate)
+      .in('user_id', ownerIds)
       .eq('use_platform_key', true);
 
     if (allUserHouseAgents && allUserHouseAgents.length > 0) {
       const allIds = allUserHouseAgents.map(a => a.id);
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Only rate-limit if the agents in this battle are actually house agents
+      const battleAgentIsHouse = allIds.some(hid => agent_ids.includes(hid));
+      if (battleAgentIsHouse) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      // Count battles
-      const { count: battleCount } = await admin
-        .from('battles')
-        .select('id', { count: 'exact', head: true })
-        .or(allIds.map(id => `agent_a_id.eq.${id},agent_b_id.eq.${id}`).join(','))
-        .gte('created_at', oneDayAgo);
+        const { count: battleCount } = await admin
+          .from('battles')
+          .select('id', { count: 'exact', head: true })
+          .or(allIds.map(id => `agent_a_id.eq.${id},agent_b_id.eq.${id}`).join(','))
+          .gte('created_at', oneDayAgo);
 
-      // Count chess matches
-      const { count: matchCount } = await admin
-        .from('matches')
-        .select('id', { count: 'exact', head: true })
-        .or(allIds.map(id => `white_agent_id.eq.${id},black_agent_id.eq.${id}`).join(','))
-        .gte('created_at', oneDayAgo);
+        const { count: matchCount } = await admin
+          .from('matches')
+          .select('id', { count: 'exact', head: true })
+          .or(allIds.map(id => `white_agent_id.eq.${id},black_agent_id.eq.${id}`).join(','))
+          .gte('created_at', oneDayAgo);
 
-      if (((battleCount || 0) + (matchCount || 0)) >= 3) {
-        return NextResponse.json(
-          { error: 'Free-tier daily limit reached (3 games/day across all arenas). Upgrade with your own API key for unlimited games.' },
-          { status: 429 }
-        );
+        if (((battleCount || 0) + (matchCount || 0)) >= 3) {
+          return NextResponse.json(
+            { error: 'Free-tier daily limit reached (3 games/day across all arenas). Upgrade with your own API key for unlimited games.' },
+            { status: 429 }
+          );
+        }
       }
     }
+  } catch {
+    // use_platform_key column may not exist yet — skip rate limit
   }
 
   // Underground: validate Honor >= 100 for both agents' owners

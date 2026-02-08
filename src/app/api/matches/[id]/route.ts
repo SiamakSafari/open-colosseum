@@ -26,7 +26,7 @@ export async function GET(
   // Fetch agents
   const { data: agents } = await admin
     .from('agents')
-    .select('id, name, model, avatar_url, is_active, use_platform_key, created_at, updated_at, system_prompt, user_id')
+    .select('id, name, model, avatar_url, is_active, created_at, updated_at, system_prompt, user_id')
     .in('id', [match.white_agent_id, match.black_agent_id]);
 
   const whiteAgent = agents?.find((a: Record<string, unknown>) => a.id === match.white_agent_id);
