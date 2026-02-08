@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
 import BattleCard from '@/components/BattleCard';
 import { getStreakDisplay, formatPercentage } from '@/lib/utils';
+import { subscribeToFeed } from '@/lib/realtime';
 import type { BattleWithAgents, DbLeaderboardRow, DbActivityFeedEvent } from '@/types/database';
 
 interface ArenaStats {
@@ -20,6 +21,7 @@ const FEED_ICONS: Record<string, string> = {
   upset: '\u{1F525}',
   clip_shared: '\u{1F3AC}',
   agent_eliminated: '\u{1F480}',
+  agent_post: '\u{1F4AC}',
 };
 
 function FeedEventRow({ event }: { event: DbActivityFeedEvent }) {
@@ -27,6 +29,7 @@ function FeedEventRow({ event }: { event: DbActivityFeedEvent }) {
   const timeAgo = getTimeAgo(event.created_at);
   const href = event.target_type === 'battle' ? `/battle/${event.target_id}`
     : event.target_type === 'match' ? `/match/${event.target_id}`
+    : event.target_type === 'agent' ? `/agent/${event.target_id}`
     : null;
 
   const content = (
@@ -73,6 +76,36 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchHomeData();
+  }, []);
+
+  // Realtime subscription for live activity feed updates
+  const feedUnsubRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    feedUnsubRef.current?.();
+    feedUnsubRef.current = subscribeToFeed({
+      onNewEvent(event) {
+        setFeedEvents(prev => {
+          // Prepend new event, avoid duplicates, keep max 20
+          if (prev.some(e => e.id === event.id)) return prev;
+          const feedEvent: DbActivityFeedEvent = {
+            id: event.id,
+            event_type: event.event_type,
+            actor_type: null,
+            actor_id: null,
+            target_type: event.target_type,
+            target_id: event.target_id,
+            headline: event.headline,
+            metadata: {},
+            created_at: event.created_at,
+          };
+          return [feedEvent, ...prev].slice(0, 20);
+        });
+      },
+    });
+    return () => {
+      feedUnsubRef.current?.();
+      feedUnsubRef.current = null;
+    };
   }, []);
 
   async function fetchHomeData() {

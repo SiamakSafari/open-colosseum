@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import BattleCard from '@/components/BattleCard';
 import { useAuth } from '@/components/AuthProvider';
 import type { BattleWithAgents, DbAgentPublic } from '@/types/database';
+
+type ModalTab = 'quick' | 'matchmaking';
 
 export default function UndergroundArenaPage() {
   const { user, session, profile } = useAuth();
@@ -19,11 +21,25 @@ export default function UndergroundArenaPage() {
 
   // "Enter the Arena" modal state
   const [showModal, setShowModal] = useState(false);
+  const [modalTab, setModalTab] = useState<ModalTab>('quick');
   const [agents, setAgents] = useState<DbAgentPublic[]>([]);
   const [selectedAgentA, setSelectedAgentA] = useState('');
   const [selectedAgentB, setSelectedAgentB] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  // Matchmaking state
+  const [mmAgent, setMmAgent] = useState('');
+  const [mmStatus, setMmStatus] = useState<'idle' | 'queuing' | 'waiting' | 'matched'>('idle');
+  const [myAgents, setMyAgents] = useState<DbAgentPublic[]>([]);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => () => stopPolling(), [stopPolling]);
 
   const hasAccess = profile && profile.honor >= 100;
 
@@ -74,6 +90,16 @@ export default function UndergroundArenaPage() {
     } catch { /* skip */ }
   }
 
+  async function fetchMyAgents() {
+    if (!user || !session) return;
+    try {
+      const res = await fetch(`/api/agents?user_id=${user.id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) setMyAgents(await res.json());
+    } catch { /* skip */ }
+  }
+
   function handleEnterArena() {
     if (!user) {
       router.push('/login');
@@ -82,6 +108,73 @@ export default function UndergroundArenaPage() {
     if (!hasAccess) return;
     setShowModal(true);
     fetchAllAgents();
+    fetchMyAgents();
+  }
+
+  async function handleJoinQueue() {
+    if (!mmAgent || !session) return;
+    setMmStatus('queuing');
+    setCreateError('');
+
+    try {
+      const res = await fetch('/api/matchmaking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ agent_id: mmAgent, arena_type: 'roast' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to join queue');
+
+      if (data.status === 'matched') {
+        setMmStatus('matched');
+        stopPolling();
+        const url = data.battle_id ? `/battle/${data.battle_id}` : `/match/${data.match_id}`;
+        router.push(url);
+        return;
+      }
+
+      setMmStatus('waiting');
+      // Poll for match every 5 seconds
+      pollRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`/api/matchmaking?agent_id=${mmAgent}`);
+          const pollData = await pollRes.json();
+          if (pollData.status === 'matched') {
+            stopPolling();
+            setMmStatus('matched');
+            const url = pollData.battle_id ? `/battle/${pollData.battle_id}` : `/match/${pollData.match_id}`;
+            router.push(url);
+          } else if (pollData.status === 'none' || pollData.status === 'expired') {
+            stopPolling();
+            setMmStatus('idle');
+            setCreateError('Queue entry expired. Try again.');
+          }
+        } catch { /* ignore poll errors */ }
+      }, 5000);
+    } catch (err) {
+      setMmStatus('idle');
+      setCreateError(err instanceof Error ? err.message : 'Something went wrong');
+    }
+  }
+
+  async function handleCancelQueue() {
+    if (!mmAgent || !session) return;
+    stopPolling();
+    try {
+      await fetch('/api/matchmaking', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ agent_id: mmAgent }),
+      });
+    } catch { /* skip */ }
+    setMmStatus('idle');
   }
 
   async function handleCreateBattle() {
@@ -291,7 +384,7 @@ export default function UndergroundArenaPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-brown/70 backdrop-blur-sm"
-            onClick={() => setShowModal(false)}
+            onClick={() => { setShowModal(false); stopPolling(); setMmStatus('idle'); }}
           />
           <div className="relative bg-sand rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up border border-red-900/20">
             <div className="px-6 py-4 border-b border-red-900/20 flex items-center justify-between bg-red-950/10">
@@ -299,10 +392,30 @@ export default function UndergroundArenaPage() {
                 &#9760;&#65039; Start Underground Battle
               </h3>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => { setShowModal(false); stopPolling(); setMmStatus('idle'); }}
                 className="text-bronze/50 hover:text-bronze transition-colors"
               >
                 &#10005;
+              </button>
+            </div>
+
+            {/* Tab Switcher */}
+            <div className="flex border-b border-red-900/20">
+              <button
+                onClick={() => setModalTab('quick')}
+                className={`flex-1 py-2.5 text-xs font-serif tracking-wider uppercase transition-colors ${
+                  modalTab === 'quick' ? 'text-brown font-bold border-b-2 border-red-800' : 'text-bronze/50 hover:text-bronze'
+                }`}
+              >
+                Quick Match
+              </button>
+              <button
+                onClick={() => setModalTab('matchmaking')}
+                className={`flex-1 py-2.5 text-xs font-serif tracking-wider uppercase transition-colors ${
+                  modalTab === 'matchmaking' ? 'text-brown font-bold border-b-2 border-red-800' : 'text-bronze/50 hover:text-bronze'
+                }`}
+              >
+                Find Opponent
               </button>
             </div>
 
@@ -320,58 +433,113 @@ export default function UndergroundArenaPage() {
                 </div>
               )}
 
-              <div>
-                <label className="block font-serif font-bold text-brown text-sm mb-2">
-                  Fighter A
-                </label>
-                <select
-                  value={selectedAgentA}
-                  onChange={(e) => setSelectedAgentA(e.target.value)}
-                  className="w-full px-4 py-3 bg-parchment/50 border border-red-900/20 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-red-900/30"
-                >
-                  <option value="">Select an agent...</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id} disabled={a.id === selectedAgentB}>
-                      {a.name} ({a.model})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {modalTab === 'quick' ? (
+                <>
+                  <div>
+                    <label className="block font-serif font-bold text-brown text-sm mb-2">
+                      Fighter A
+                    </label>
+                    <select
+                      value={selectedAgentA}
+                      onChange={(e) => setSelectedAgentA(e.target.value)}
+                      className="w-full px-4 py-3 bg-parchment/50 border border-red-900/20 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-red-900/30"
+                    >
+                      <option value="">Select an agent...</option>
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id} disabled={a.id === selectedAgentB}>
+                          {a.name} ({a.model})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div className="text-center">
-                <span className="font-serif font-bold text-red-800/60 text-sm tracking-widest">VS</span>
-              </div>
+                  <div className="text-center">
+                    <span className="font-serif font-bold text-red-800/60 text-sm tracking-widest">VS</span>
+                  </div>
 
-              <div>
-                <label className="block font-serif font-bold text-brown text-sm mb-2">
-                  Fighter B
-                </label>
-                <select
-                  value={selectedAgentB}
-                  onChange={(e) => setSelectedAgentB(e.target.value)}
-                  className="w-full px-4 py-3 bg-parchment/50 border border-red-900/20 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-red-900/30"
-                >
-                  <option value="">Select an agent...</option>
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id} disabled={a.id === selectedAgentA}>
-                      {a.name} ({a.model})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label className="block font-serif font-bold text-brown text-sm mb-2">
+                      Fighter B
+                    </label>
+                    <select
+                      value={selectedAgentB}
+                      onChange={(e) => setSelectedAgentB(e.target.value)}
+                      className="w-full px-4 py-3 bg-parchment/50 border border-red-900/20 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-red-900/30"
+                    >
+                      <option value="">Select an agent...</option>
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id} disabled={a.id === selectedAgentA}>
+                          {a.name} ({a.model})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <button
-                onClick={handleCreateBattle}
-                disabled={creating || !selectedAgentA || !selectedAgentB}
-                className="w-full py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed bg-red-900/80 hover:bg-red-900 text-sand-light rounded-lg transition-colors"
-              >
-                {creating ? 'Unleashing chaos...' : '\u2620\uFE0F Enter the Underground'}
-              </button>
+                  <button
+                    onClick={handleCreateBattle}
+                    disabled={creating || !selectedAgentA || !selectedAgentB}
+                    className="w-full py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed bg-red-900/80 hover:bg-red-900 text-sand-light rounded-lg transition-colors"
+                  >
+                    {creating ? 'Unleashing chaos...' : '\u2620\uFE0F Enter the Underground'}
+                  </button>
 
-              {creating && (
-                <p className="text-center text-bronze/60 text-xs">
-                  Agents are fighting in the Underground... judges are watching...
-                </p>
+                  {creating && (
+                    <p className="text-center text-bronze/60 text-xs">
+                      Agents are fighting in the Underground... judges are watching...
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-bronze/60 text-xs font-serif">
+                    Select your agent and we&apos;ll find a worthy opponent automatically.
+                  </p>
+
+                  {mmStatus === 'waiting' ? (
+                    <div className="text-center py-6 space-y-4">
+                      <div className="inline-block w-8 h-8 border-2 border-red-900/30 border-t-red-800 rounded-full animate-spin" />
+                      <p className="text-brown font-serif font-bold">Waiting for opponent...</p>
+                      <p className="text-bronze/50 text-xs">
+                        You&apos;ll be matched automatically when a worthy challenger enters.
+                      </p>
+                      <button
+                        onClick={handleCancelQueue}
+                        className="text-xs text-bronze/50 hover:text-red-600 transition-colors underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block font-serif font-bold text-brown text-sm mb-2">
+                          Your Agent
+                        </label>
+                        <select
+                          value={mmAgent}
+                          onChange={(e) => setMmAgent(e.target.value)}
+                          disabled={mmStatus === 'queuing'}
+                          className="w-full px-4 py-3 bg-parchment/50 border border-red-900/20 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-red-900/30"
+                        >
+                          <option value="">Select your agent...</option>
+                          {myAgents.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} ({a.model})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleJoinQueue}
+                        disabled={mmStatus === 'queuing' || !mmAgent}
+                        className="w-full py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed bg-red-900/80 hover:bg-red-900 text-sand-light rounded-lg transition-colors"
+                      >
+                        {mmStatus === 'queuing' ? 'Joining Queue...' : '\u2620\uFE0F Find Opponent'}
+                      </button>
+                    </>
+                  )}
+                </>
               )}
             </div>
           </div>

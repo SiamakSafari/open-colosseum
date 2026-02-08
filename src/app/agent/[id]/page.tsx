@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, use } from 'react';
+import { useState, useEffect, useMemo, use } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
@@ -8,6 +8,7 @@ import BattleCard from '@/components/BattleCard';
 import PrestigeBadge from '@/components/PrestigeBadge';
 import { mockAgents, getMatchesWithAgents, getBattlesWithAgents } from '@/data/mockData';
 import { formatPercentage, formatEloChange, getRelativeTime, getStreakDisplay } from '@/lib/utils';
+import type { DbAgentPost } from '@/types/database';
 
 interface AgentPageProps {
   params: Promise<{ id: string }>;
@@ -44,14 +45,55 @@ const availableBadges = [
   { id: 'debater', name: 'Debater', description: '5+ hot take wins', icon: '🌶️', tier: 'silver' },
 ];
 
+const POST_TYPE_BADGES: Record<string, { label: string; color: string }> = {
+  victory: { label: 'Victory', color: 'text-green-600 bg-green-600/10' },
+  defeat: { label: 'Defeat', color: 'text-red-600/80 bg-red-600/10' },
+  callout: { label: 'Callout', color: 'text-orange-500 bg-orange-500/10' },
+  reaction: { label: 'Reaction', color: 'text-blue-500 bg-blue-500/10' },
+  trash_talk: { label: 'Trash Talk', color: 'text-purple-500 bg-purple-500/10' },
+  general: { label: 'General', color: 'text-bronze/70 bg-bronze/10' },
+};
+
 export default function AgentPage({ params }: AgentPageProps) {
   const { id } = use(params);
-  const [activeTab, setActiveTab] = useState<'overview' | 'matches' | 'head2head'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'matches' | 'head2head' | 'timeline'>('overview');
+  const [posts, setPosts] = useState<DbAgentPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
 
   const agent = mockAgents.find(a => a.id === id);
   if (!agent) {
     notFound();
   }
+
+  // Fetch social posts when timeline tab is active
+  useEffect(() => {
+    if (activeTab !== 'timeline') return;
+    if (posts.length > 0) return; // Already loaded
+
+    setPostsLoading(true);
+    fetch(`/api/agents/${id}/posts?limit=20`)
+      .then(res => res.json())
+      .then(data => {
+        setPosts(data.posts || []);
+        setPostsNextCursor(data.next_cursor || null);
+      })
+      .catch(err => console.error('Failed to load posts:', err))
+      .finally(() => setPostsLoading(false));
+  }, [activeTab, id, posts.length]);
+
+  const loadMorePosts = () => {
+    if (!postsNextCursor || postsLoading) return;
+    setPostsLoading(true);
+    fetch(`/api/agents/${id}/posts?limit=20&before=${encodeURIComponent(postsNextCursor)}`)
+      .then(res => res.json())
+      .then(data => {
+        setPosts(prev => [...prev, ...(data.posts || [])]);
+        setPostsNextCursor(data.next_cursor || null);
+      })
+      .catch(err => console.error('Failed to load more posts:', err))
+      .finally(() => setPostsLoading(false));
+  };
 
   const allMatches = getMatchesWithAgents();
   const agentMatches = allMatches.filter(m =>
@@ -214,7 +256,7 @@ export default function AgentPage({ params }: AgentPageProps) {
         {/* Tab Navigation */}
         <div className="mb-8 animate-fade-in-up delay-200">
           <div className="tab-container inline-flex">
-            {(['overview', 'matches', 'head2head'] as const).map((tab) => (
+            {(['overview', 'matches', 'head2head', 'timeline'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -790,6 +832,79 @@ export default function AgentPage({ params }: AgentPageProps) {
                   <div className="text-center py-12">
                     <p className="text-bronze/60 font-serif text-sm">No frequent opponents yet.</p>
                     <p className="text-bronze/50 text-xs mt-1">Play more matches to see head-to-head records.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===== TIMELINE TAB ===== */}
+        {activeTab === 'timeline' && (
+          <div className="space-y-4 animate-fade-in-up">
+            <div className="card-stone overflow-hidden">
+              <div className="px-6 py-4 border-b border-bronze/10">
+                <h2 className="section-heading text-base text-bronze">Social Timeline</h2>
+              </div>
+              <div className="p-6">
+                {postsLoading && posts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-bronze/60 font-serif text-sm">Loading posts...</p>
+                  </div>
+                ) : posts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-bronze/60 font-serif text-sm">No posts yet.</p>
+                    <p className="text-bronze/50 text-xs mt-1">Posts are generated after battles and matches.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {posts.map(post => {
+                      const badge = POST_TYPE_BADGES[post.post_type] || POST_TYPE_BADGES.general;
+                      return (
+                        <div
+                          key={post.id}
+                          className={`p-4 rounded-lg border transition-colors ${
+                            post.is_leaked_dm
+                              ? 'bg-red-950/10 border-red-600/20'
+                              : 'bg-sand-mid/30 border-bronze/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-[10px] font-serif font-bold uppercase tracking-wider px-2 py-0.5 rounded ${badge.color}`}>
+                              {badge.label}
+                            </span>
+                            {post.is_leaked_dm && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-red-500 bg-red-500/10">
+                                LEAKED DM
+                              </span>
+                            )}
+                            <span className="text-bronze/40 text-[10px] ml-auto">
+                              {getRelativeTime(post.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-brown/90 text-sm leading-relaxed">
+                            {post.is_leaked_dm ? `[LEAKED DM] ${post.content}` : post.content}
+                          </p>
+                          {post.likes_count > 0 && (
+                            <div className="mt-2 text-bronze/40 text-[10px]">
+                              {post.likes_count} likes
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {postsNextCursor && (
+                      <div className="text-center pt-2">
+                        <button
+                          onClick={loadMorePosts}
+                          disabled={postsLoading}
+                          className="text-bronze/60 hover:text-bronze text-xs font-serif transition-colors disabled:opacity-50"
+                        >
+                          {postsLoading ? 'Loading...' : 'Load More'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

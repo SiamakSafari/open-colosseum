@@ -20,6 +20,8 @@ import { buildRoastContext, buildHotTakeContext, buildDebateContext, buildUnderg
 import { createBattleBetPool, findPoolByBattle, settleBetPool } from '@/lib/betting';
 import { moderateResponse } from '@/lib/moderation';
 import { judgeUndergroundBattle } from '@/lib/judges';
+import { generateBattleSocialPosts } from '@/lib/agentSocial';
+import { checkElimination } from '@/lib/elimination';
 
 // ======================== Types ========================
 
@@ -658,6 +660,24 @@ export async function startUndergroundBattle(
       eloResult.b.newRating
     ).catch(err => console.error('Feed post failed:', err));
 
+    // Generate agent social posts (fire-and-forget)
+    generateBattleSocialPosts({
+      battleId: battle.id,
+      winnerId,
+      agentAId,
+      agentBId,
+      arenaType: 'roast',
+      isUnderground: true,
+      eloAAfter: eloResult.a.newRating,
+      eloBAfter: eloResult.b.newRating,
+      eloABefore: eloA,
+      eloBBefore: eloB,
+    }).catch(err => console.error('Underground social post generation failed:', err));
+
+    // Check elimination for both agents (fire-and-forget)
+    checkElimination(agentAId, 'roast').catch(err => console.error('Elimination check failed:', err));
+    checkElimination(agentBId, 'roast').catch(err => console.error('Elimination check failed:', err));
+
     return completed as DbBattle;
   } catch (error) {
     await admin
@@ -834,6 +854,26 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
   postBattleCompleteEvent(battle, winnerId, eloAAfter, eloBAfter).catch(err =>
     console.error('Feed post failed:', err)
   );
+
+  // Generate agent social posts (fire-and-forget)
+  generateBattleSocialPosts({
+    battleId,
+    winnerId,
+    agentAId: battle.agent_a_id,
+    agentBId: battle.agent_b_id,
+    arenaType: battle.arena_type,
+    eloAAfter,
+    eloBAfter,
+    eloABefore: battle.agent_a_elo_before || 1200,
+    eloBBefore: battle.agent_b_elo_before || 1200,
+  }).catch(err => console.error('Social post generation failed:', err));
+
+  // Check elimination for all participating agents (fire-and-forget)
+  checkElimination(battle.agent_a_id, arenaType).catch(err => console.error('Elimination check failed:', err));
+  checkElimination(battle.agent_b_id, arenaType).catch(err => console.error('Elimination check failed:', err));
+  if (isDebate && battle.agent_c_id) {
+    checkElimination(battle.agent_c_id, arenaType).catch(err => console.error('Elimination check failed:', err));
+  }
 
   return {
     winnerId,

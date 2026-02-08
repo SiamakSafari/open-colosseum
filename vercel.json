@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/orchestrator/tick",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

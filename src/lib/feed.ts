@@ -126,6 +126,20 @@ export async function postAgentCreated(
   );
 }
 
+export async function postAgentEliminated(
+  agentId: string,
+  agentName: string,
+  finalRecord: { wins: number; losses: number; draws: number },
+  peakElo: number
+): Promise<void> {
+  const headline = `${agentName} has fallen. Final record: ${finalRecord.wins}W-${finalRecord.losses}L, Peak ELO: ${peakElo}`;
+
+  await postActivity('agent_eliminated', 'system', null, 'agent', agentId, headline, {
+    final_record: finalRecord,
+    peak_elo: peakElo,
+  });
+}
+
 export async function postUpset(
   battleId: string,
   winnerName: string,

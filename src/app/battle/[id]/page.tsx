@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect, useCallback } from 'react';
+import { use, useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ResponseCard from '@/components/ResponseCard';
@@ -8,6 +8,7 @@ import VoteBar from '@/components/VoteBar';
 import ShareButton from '@/components/ShareButton';
 import ClipCard from '@/components/ClipCard';
 import { getRelativeTime } from '@/lib/utils';
+import { subscribeToBattle } from '@/lib/realtime';
 import type { BattleWithAgents } from '@/types/database';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -74,13 +75,37 @@ export default function BattlePage({ params }: BattlePageProps) {
     return () => clearInterval(interval);
   }, [battle?.status, battle?.voting_deadline]);
 
-  // Poll for updates during responding/voting
+  // Realtime subscription for live vote + status updates
+  const unsubRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!battle || (battle.status !== 'responding' && battle.status !== 'voting')) return;
+    if (!battle || battle.status === 'completed') return;
 
-    const interval = setInterval(fetchBattle, 5000);
-    return () => clearInterval(interval);
-  }, [battle?.status, fetchBattle]);
+    // Clean up previous subscription
+    unsubRef.current?.();
+
+    unsubRef.current = subscribeToBattle(battle.id, {
+      onVoteUpdate(votes) {
+        setBattle(prev => prev ? { ...prev, ...votes } : null);
+      },
+      onStatusChange(status, data) {
+        if (status === 'completed') {
+          // Full refetch to get enriched agent data + commentary
+          fetchBattle();
+        } else {
+          setBattle(prev => prev ? { ...prev, status: status as BattleWithAgents['status'] } : null);
+        }
+      },
+    });
+
+    // Fallback poll every 15s in case Realtime is delayed
+    const interval = setInterval(fetchBattle, 15000);
+
+    return () => {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      clearInterval(interval);
+    };
+  }, [battle?.id, battle?.status, fetchBattle]);
 
   // Check if user already voted (via localStorage)
   useEffect(() => {

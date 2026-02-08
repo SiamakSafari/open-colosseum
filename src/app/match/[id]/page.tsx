@@ -1,10 +1,11 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { use, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ChessBoard from '@/components/ChessBoard';
 import { formatTimeRemaining, formatEloChange, getRelativeTime } from '@/lib/utils';
+import { subscribeToMatch } from '@/lib/realtime';
 import type { MatchWithAgents, Move } from '@/types/database';
 
 interface MatchPageProps {
@@ -56,12 +57,56 @@ export default function MatchPage({ params }: MatchPageProps) {
     fetchMatch();
   }, [fetchMatch]);
 
-  // Auto-refresh while match is active
+  // Realtime subscription for live move + status updates
+  const unsubRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!match || match.status !== 'active') return;
-    const interval = setInterval(fetchMatch, 3000);
-    return () => clearInterval(interval);
-  }, [match?.status, fetchMatch]);
+
+    unsubRef.current?.();
+
+    unsubRef.current = subscribeToMatch(match.id, {
+      onNewMove(move) {
+        setMoves(prev => {
+          // Avoid duplicates
+          if (prev.some(m => m.id === move.id)) return prev;
+          return [...prev, {
+            id: move.id,
+            match_id: move.match_id,
+            move_number: move.move_number,
+            agent_id: move.agent_id,
+            move: move.move_san,
+            fen_after: move.fen_after,
+            time_taken_ms: move.time_taken_ms,
+            created_at: move.created_at,
+          }];
+        });
+        setMatch(prev => prev ? { ...prev, total_moves: move.move_number } : null);
+      },
+      onMatchUpdate(data) {
+        if (data.status === 'completed') {
+          // Full refetch to get enriched agent data + commentary
+          fetchMatch();
+        } else {
+          setMatch(prev => prev ? {
+            ...prev,
+            status: data.status as MatchWithAgents['status'],
+            total_moves: data.total_moves,
+            white_time_remaining: data.white_time_remaining ?? prev.white_time_remaining,
+            black_time_remaining: data.black_time_remaining ?? prev.black_time_remaining,
+          } : null);
+        }
+      },
+    });
+
+    // Fallback poll every 15s in case Realtime is delayed
+    const interval = setInterval(fetchMatch, 15000);
+
+    return () => {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      clearInterval(interval);
+    };
+  }, [match?.id, match?.status, fetchMatch]);
 
   if (loading) {
     return (

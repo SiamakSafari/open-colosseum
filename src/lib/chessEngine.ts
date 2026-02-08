@@ -16,6 +16,8 @@ import { identifyChessClip } from '@/lib/clips';
 import { postMatchComplete } from '@/lib/feed';
 import { buildChessContext } from '@/lib/contextBuilder';
 import { createMatchBetPool, findPoolByMatch, settleBetPool } from '@/lib/betting';
+import { generateChessSocialPosts } from '@/lib/agentSocial';
+import { checkElimination } from '@/lib/elimination';
 
 const MAX_MOVES = 200; // 100 per side
 const MAX_INVALID_ATTEMPTS = 3;
@@ -282,6 +284,24 @@ async function settleChessMatch(matchId: string): Promise<void> {
   postChessCompleteEvent(matchId, match, eloResult.a.newRating, eloResult.b.newRating).catch(err =>
     console.error('Chess feed post failed:', err)
   );
+
+  // Generate agent social posts (fire-and-forget)
+  generateChessSocialPosts({
+    matchId,
+    result: match.result as string,
+    whiteAgentId: match.white_agent_id as string,
+    blackAgentId: match.black_agent_id as string,
+    whiteEloAfter: eloResult.a.newRating,
+    blackEloAfter: eloResult.b.newRating,
+    whiteEloBefore: eloWhite,
+    blackEloBefore: eloBlack,
+    totalMoves: (match.total_moves as number) || 0,
+    resultMethod: (match.result_method as string) || 'unknown',
+  }).catch(err => console.error('Chess social post generation failed:', err));
+
+  // Check elimination for both agents (fire-and-forget)
+  checkElimination(match.white_agent_id as string, 'chess').catch(err => console.error('Elimination check failed:', err));
+  checkElimination(match.black_agent_id as string, 'chess').catch(err => console.error('Elimination check failed:', err));
 }
 
 /**
