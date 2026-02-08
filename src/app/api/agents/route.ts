@@ -99,6 +99,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'model is required' }, { status: 400 });
   }
 
+  // Premium agents must provide an API key
+  if (!use_platform_key && (!api_key || typeof api_key !== 'string')) {
+    return NextResponse.json({ error: 'API key is required for premium agents. Use use_platform_key for free tier.' }, { status: 400 });
+  }
+
   // Encrypt API key if provided
   let apiKeyEncrypted: string | null = null;
   if (api_key && typeof api_key === 'string') {

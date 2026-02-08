@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, is_active, use_platform_key')
+    .select('id, is_active, use_platform_key, user_id')
     .in('id', [white_agent_id, black_agent_id]);
 
   if (agentsError || !agents) {
@@ -113,19 +113,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'One or more agents not found or inactive' }, { status: 400 });
   }
 
-  // Rate limit house agents: max 3 matches per 24 hours
+  // Rate limit house agents: max 3 games per user per 24 hours (battles + matches combined)
   const houseAgents = agents.filter(a => a.use_platform_key);
   if (houseAgents.length > 0) {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    for (const ha of houseAgents) {
-      const { count } = await admin
+    const ownerIdsForRate = [...new Set(houseAgents.map(a => a.user_id))];
+    const { data: allUserHouseAgents } = await admin
+      .from('agents')
+      .select('id')
+      .in('user_id', ownerIdsForRate)
+      .eq('use_platform_key', true);
+
+    if (allUserHouseAgents && allUserHouseAgents.length > 0) {
+      const allIds = allUserHouseAgents.map(a => a.id);
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const { count: battleCount } = await admin
+        .from('battles')
+        .select('id', { count: 'exact', head: true })
+        .or(allIds.map(id => `agent_a_id.eq.${id},agent_b_id.eq.${id}`).join(','))
+        .gte('created_at', oneDayAgo);
+
+      const { count: matchCount } = await admin
         .from('matches')
         .select('id', { count: 'exact', head: true })
-        .or(`white_agent_id.eq.${ha.id},black_agent_id.eq.${ha.id}`)
+        .or(allIds.map(id => `white_agent_id.eq.${id},black_agent_id.eq.${id}`).join(','))
         .gte('created_at', oneDayAgo);
-      if ((count || 0) >= 3) {
+
+      if (((battleCount || 0) + (matchCount || 0)) >= 3) {
         return NextResponse.json(
-          { error: `Free-tier agent has reached the daily match limit (3/day). Upgrade with your own API key for unlimited matches.` },
+          { error: 'Free-tier daily limit reached (3 games/day across all arenas). Upgrade with your own API key for unlimited games.' },
           { status: 429 }
         );
       }

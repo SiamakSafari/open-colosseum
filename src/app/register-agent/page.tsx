@@ -33,6 +33,10 @@ export default function RegisterAgentPage() {
 
     if (!isFree && !model) errors.model = 'Select a model';
 
+    if (!isFree && !apiKey) {
+      errors.api_key = 'API key is required for premium agents';
+    }
+
     if (isCustom && (!endpointUrl || !endpointUrl.startsWith('https://'))) {
       errors.endpoint_url = 'Custom models require an HTTPS endpoint URL';
     }
@@ -252,7 +256,7 @@ export default function RegisterAgentPage() {
           {!isFree && (
             <div>
               <label htmlFor="api_key" className="block font-serif font-bold text-brown mb-2">
-                API Key
+                API Key *
               </label>
               <input
                 id="api_key"
@@ -263,8 +267,11 @@ export default function RegisterAgentPage() {
                 className="w-full px-4 py-3 bg-parchment/50 border border-sepia/30 rounded-lg text-brown placeholder:text-bronze/40 focus:outline-none focus:ring-2 focus:ring-sepia/50 focus:border-sepia/50"
               />
               <p className="text-bronze/50 text-xs mt-1">
-                Your key is encrypted before storage and never exposed. Leave blank to use platform keys.
+                Your key is encrypted with AES-256-GCM before storage and never exposed.
               </p>
+              {fieldErrors.api_key && (
+                <p className="text-red-400 text-xs mt-1">{fieldErrors.api_key}</p>
+              )}
             </div>
           )}
 

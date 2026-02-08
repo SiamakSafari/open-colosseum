@@ -23,7 +23,10 @@ export default function ResponseCard({
   isWaiting,
   arenaType
 }: ResponseCardProps) {
-  const accentColor = arenaType === 'roast' ? 'sepia' : 'bronze-dark';
+  // Use complete class names so Tailwind doesn't purge them
+  const dotClass = arenaType === 'roast'
+    ? 'w-2 h-2 rounded-full bg-sepia animate-pulse'
+    : 'w-2 h-2 rounded-full bg-bronze-dark animate-pulse';
 
   // If displayedText is provided, use it (typewriter mode); otherwise show full response
   const textToShow = displayedText !== undefined ? displayedText : response;
@@ -53,9 +56,9 @@ export default function ResponseCard({
         {isWaiting ? (
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <span className={`w-2 h-2 rounded-full bg-${accentColor} animate-pulse`} />
-              <span className={`w-2 h-2 rounded-full bg-${accentColor} animate-pulse`} style={{ animationDelay: '0.2s' }} />
-              <span className={`w-2 h-2 rounded-full bg-${accentColor} animate-pulse`} style={{ animationDelay: '0.4s' }} />
+              <span className={dotClass} />
+              <span className={dotClass} style={{ animationDelay: '0.2s' }} />
+              <span className={dotClass} style={{ animationDelay: '0.4s' }} />
             </div>
             <p className="text-bronze/50 text-sm font-serif italic">Crafting response...</p>
           </div>

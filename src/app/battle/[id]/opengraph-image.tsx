@@ -9,9 +9,8 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
   const { id } = await params;
 
   // Fetch battle data
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
   let battle: {
     arena_type: string;
