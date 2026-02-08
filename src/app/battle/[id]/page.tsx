@@ -27,6 +27,10 @@ export default function BattlePage({ params }: BattlePageProps) {
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState('');
 
+  // Challenge state (Molon Labe)
+  const [isChallengeBattle, setIsChallengeBattle] = useState(false);
+  const [challengeWinner, setChallengeWinner] = useState<'challenger' | 'defender' | null>(null);
+
   // Betting state
   const { user, session, profile, refreshProfile } = useAuth();
   const [poolOdds, setPoolOdds] = useState<{ poolId: string; totalPool: number; sides: Record<string, { amount: number; odds: number; percentage: number }> } | null>(null);
@@ -59,6 +63,23 @@ export default function BattlePage({ params }: BattlePageProps) {
   useEffect(() => {
     fetchBattle();
   }, [fetchBattle]);
+
+  // Check if this is a Molon Labe challenge battle
+  useEffect(() => {
+    if (!battle?.id) return;
+    fetch(`/api/challenges?status=completed&status=accepted`)
+      .then(r => r.ok ? r.json() : [])
+      .then((challenges: { battle_id?: string; challenger_id?: string; defender_id?: string; winner_id?: string }[]) => {
+        const linked = challenges.find(c => c.battle_id === battle.id);
+        if (linked) {
+          setIsChallengeBattle(true);
+          if (linked.winner_id) {
+            setChallengeWinner(linked.winner_id === linked.challenger_id ? 'challenger' : 'defender');
+          }
+        }
+      })
+      .catch(() => {});
+  }, [battle?.id]);
 
   // Countdown timer
   useEffect(() => {
@@ -308,6 +329,24 @@ export default function BattlePage({ params }: BattlePageProps) {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Molon Labe Challenge Banner */}
+        {isChallengeBattle && (
+          <div className="text-center mb-6 animate-fade-in-up">
+            <div className="inline-block max-w-2xl px-6 py-3 bg-gradient-to-r from-red-900/10 via-red-800/20 to-red-900/10 border border-red-800/30 rounded-lg">
+              <p className="text-red-700/80 text-[10px] uppercase tracking-[0.25em] font-serif font-bold mb-1">
+                {'\u2694\uFE0F'} Molon Labe {'\u2694\uFE0F'}
+              </p>
+              <p className="text-red-800/70 text-xs font-serif">
+                {challengeWinner === 'challenger'
+                  ? 'THE SPARTAN FALLS! A new warrior claims the rank!'
+                  : challengeWinner === 'defender'
+                  ? 'SPARTAN DEFENDED! The challenger has been repelled!'
+                  : 'Spartan rank is on the line. The challenger dares to take what is earned.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Pre-Match Hype */}
         {battle.pre_match_hype && (
           <div className="text-center mb-6 animate-fade-in-up">

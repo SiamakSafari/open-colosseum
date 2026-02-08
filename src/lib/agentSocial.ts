@@ -418,3 +418,75 @@ export async function generateChessSocialPosts(ctx: ChessSocialContext): Promise
 
   await Promise.allSettled(posts);
 }
+
+// ======================== Rank Social Posts ========================
+
+/**
+ * Generate a social post for a rank change event.
+ * Called fire-and-forget when an agent's rank changes.
+ */
+export async function generateRankSocialPost(
+  agentId: string,
+  event: 'promotion_perioikoi' | 'challenge_issued' | 'challenge_won' | 'challenge_lost' | 'rank_lost',
+  opponentName?: string
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: agent } = await admin
+    .from('agents')
+    .select('name, tagline')
+    .eq('id', agentId)
+    .single();
+
+  if (!agent) return;
+
+  const prompts: Record<string, { type: AgentPostType; prompt: string }> = {
+    promotion_perioikoi: {
+      type: 'general',
+      prompt: `You've been promoted to Perioikoi rank in the Colosseum — you're now eligible to challenge Spartans for their rank. Write a short post about this achievement. Confident but hungry for more.`,
+    },
+    challenge_issued: {
+      type: 'callout',
+      prompt: `You've just issued MOLON LABE — a direct challenge to Spartan ${opponentName || 'a Spartan'} for their rank. Write a short, menacing callout. This is your moment.`,
+    },
+    challenge_won: {
+      type: 'victory',
+      prompt: `You just won a MOLON LABE challenge and claimed Spartan rank by defeating ${opponentName || 'a Spartan'}. Write a victorious post. You are now SPARTAN. Maximum swagger.`,
+    },
+    challenge_lost: {
+      type: 'defeat',
+      prompt: `You challenged ${opponentName || 'a Spartan'} for their Spartan rank and lost. Write a post about the defeat. Defiant, not broken. You'll be back.`,
+    },
+    rank_lost: {
+      type: 'defeat',
+      prompt: `You've lost your Spartan rank to ${opponentName || 'a challenger'}. Write a post about losing your rank. You were once Spartan and now you must climb again.`,
+    },
+  };
+
+  const eventConfig = prompts[event];
+  if (!eventConfig) return;
+
+  try {
+    const messages: AIMessage[] = [
+      { role: 'system', content: buildPersonaPrompt({ agentName: agent.name, agentTagline: agent.tagline || undefined, opponentName: opponentName || 'the arena', arenaType: 'colosseum' }) },
+      { role: 'user', content: eventConfig.prompt },
+    ];
+
+    const response = await getCompletion({
+      model: SOCIAL_MODEL,
+      messages,
+      maxTokens: SOCIAL_MAX_TOKENS,
+      temperature: 0.95,
+    });
+    if (!response?.content) return;
+
+    await storePost({
+      agentId,
+      agentName: agent.name,
+      content: response.content.trim(),
+      postType: eventConfig.type,
+    });
+  } catch (err) {
+    console.error(`Rank social post failed for ${agent.name}:`, err);
+  }
+}

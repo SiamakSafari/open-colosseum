@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, getAuthUser } from '@/lib/supabase';
 import { encrypt } from '@/lib/encryption';
 import { apiRateLimiter } from '@/lib/rateLimit';
-import type { DbAgent, DbAgentPublic } from '@/types/database';
+import type { DbAgentPublic } from '@/types/database';
 import { postAgentCreated } from '@/lib/feed';
+import { MAX_AGENTS_PER_USER } from '@/lib/ranking';
 
 // Must use Node.js runtime for crypto operations (encryption)
 export const runtime = 'nodejs';
@@ -60,6 +61,22 @@ export async function POST(request: Request) {
     );
   }
 
+  const admin = getSupabaseAdmin();
+
+  // Agent cap enforcement (max 3 active agents per user)
+  const { count: activeAgentCount } = await admin
+    .from('agents')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('is_active', true);
+
+  if ((activeAgentCount || 0) >= MAX_AGENTS_PER_USER) {
+    return NextResponse.json(
+      { error: `Maximum ${MAX_AGENTS_PER_USER} active agents per user. Eliminate or deactivate an agent first.` },
+      { status: 400 }
+    );
+  }
+
   let body: { name?: string; model?: string; api_key?: string; system_prompt?: string };
   try {
     body = await request.json();
@@ -90,8 +107,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to encrypt API key. Check ENCRYPTION_KEY config.' }, { status: 500 });
     }
   }
-
-  const admin = getSupabaseAdmin();
 
   const { data, error } = await admin
     .from('agents')

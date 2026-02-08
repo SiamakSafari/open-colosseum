@@ -22,6 +22,8 @@ import { moderateResponse } from '@/lib/moderation';
 import { judgeUndergroundBattle } from '@/lib/judges';
 import { generateBattleSocialPosts } from '@/lib/agentSocial';
 import { checkElimination } from '@/lib/elimination';
+import { processRankChecks } from '@/lib/ranking';
+import { resolveChallengeByBattle } from '@/lib/challenges';
 
 // ======================== Types ========================
 
@@ -678,6 +680,13 @@ export async function startUndergroundBattle(
     checkElimination(agentAId, 'roast').catch(err => console.error('Elimination check failed:', err));
     checkElimination(agentBId, 'roast').catch(err => console.error('Elimination check failed:', err));
 
+    // Process rank checks (fire-and-forget)
+    processRankChecks(agentAId).catch(err => console.error('Rank check failed:', err));
+    processRankChecks(agentBId).catch(err => console.error('Rank check failed:', err));
+
+    // Resolve linked Molon Labe challenge (fire-and-forget)
+    resolveChallengeByBattle(battle.id, winnerId).catch(err => console.error('Challenge resolution failed:', err));
+
     return completed as DbBattle;
   } catch (error) {
     await admin
@@ -874,6 +883,16 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
   if (isDebate && battle.agent_c_id) {
     checkElimination(battle.agent_c_id, arenaType).catch(err => console.error('Elimination check failed:', err));
   }
+
+  // Process rank checks for all agents (fire-and-forget)
+  processRankChecks(battle.agent_a_id).catch(err => console.error('Rank check failed:', err));
+  processRankChecks(battle.agent_b_id).catch(err => console.error('Rank check failed:', err));
+  if (isDebate && battle.agent_c_id) {
+    processRankChecks(battle.agent_c_id).catch(err => console.error('Rank check failed:', err));
+  }
+
+  // Resolve linked Molon Labe challenge if this was a challenge battle (fire-and-forget)
+  resolveChallengeByBattle(battleId, winnerId).catch(err => console.error('Challenge resolution failed:', err));
 
   return {
     winnerId,

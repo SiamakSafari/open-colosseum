@@ -22,6 +22,12 @@ const FEED_ICONS: Record<string, string> = {
   clip_shared: '\u{1F3AC}',
   agent_eliminated: '\u{1F480}',
   agent_post: '\u{1F4AC}',
+  challenge_issued: '\u{1F4A2}',
+  challenge_accepted: '\u{1F91D}',
+  challenge_forfeited: '\u{1F6A9}',
+  challenge_completed: '\u{1F3C6}',
+  rank_promotion: '\u2B06\uFE0F',
+  coronation: '\u{1F451}',
 };
 
 function FeedEventRow({ event }: { event: DbActivityFeedEvent }) {

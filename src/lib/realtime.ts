@@ -162,6 +162,80 @@ interface FeedCallbacks {
  * New events appear at the top of the feed in real time.
  * Returns an unsubscribe function.
  */
+// ======================== Challenge Subscriptions ========================
+
+interface ChallengeChange {
+  id: string;
+  challenger_id: string;
+  defender_id: string;
+  arena_type: string;
+  status: string;
+  battle_id: string | null;
+  match_id: string | null;
+  blood_stake: number;
+  winner_id: string | null;
+  created_at: string;
+  expires_at: string;
+  resolved_at: string | null;
+}
+
+interface ChallengeCallbacks {
+  onChallengeInsert?: (challenge: ChallengeChange) => void;
+  onChallengeUpdate?: (challenge: ChallengeChange) => void;
+}
+
+/**
+ * Subscribe to challenge changes for a set of agent IDs.
+ * Watches for new challenges (INSERT) and status updates (UPDATE).
+ * Supabase Realtime doesn't support complex OR filters, so we
+ * subscribe to all changes and client-filter by agent IDs.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToChallenges(
+  agentIds: string[],
+  callbacks: ChallengeCallbacks
+): () => void {
+  if (agentIds.length === 0) return () => {};
+
+  const agentIdSet = new Set(agentIds);
+
+  const channel: RealtimeChannel = supabase
+    .channel(`challenges:${agentIds[0]}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'challenges',
+      },
+      (payload) => {
+        const row = payload.new as ChallengeChange;
+        if (agentIdSet.has(row.challenger_id) || agentIdSet.has(row.defender_id)) {
+          callbacks.onChallengeInsert?.(row);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'challenges',
+      },
+      (payload) => {
+        const row = payload.new as ChallengeChange;
+        if (agentIdSet.has(row.challenger_id) || agentIdSet.has(row.defender_id)) {
+          callbacks.onChallengeUpdate?.(row);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 export function subscribeToFeed(callbacks: FeedCallbacks): () => void {
   const channel: RealtimeChannel = supabase
     .channel('feed:global')

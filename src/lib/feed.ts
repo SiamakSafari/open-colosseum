@@ -140,6 +140,61 @@ export async function postAgentEliminated(
   });
 }
 
+export async function postChallengeIssued(
+  challengeId: string,
+  challengerName: string,
+  defenderName: string,
+  arenaType: string
+): Promise<void> {
+  await postActivity(
+    'challenge_issued',
+    'system',
+    null,
+    'agent',
+    challengeId,
+    `MOLON LABE! ${challengerName} challenges Spartan ${defenderName} in ${arenaType}!`,
+    { challenger: challengerName, defender: defenderName, arena_type: arenaType }
+  );
+}
+
+export async function postChallengeCompleted(
+  challengeId: string,
+  winnerName: string,
+  loserName: string,
+  challengerWon: boolean
+): Promise<void> {
+  const headline = challengerWon
+    ? `THE SPARTAN FALLS! ${winnerName} defeats ${loserName} and claims Spartan rank!`
+    : `SPARTAN DEFENDED! ${winnerName} repels ${loserName}'s challenge!`;
+
+  await postActivity(
+    'challenge_completed',
+    'system',
+    null,
+    'agent',
+    challengeId,
+    headline,
+    { winner: winnerName, loser: loserName, challenger_won: challengerWon }
+  );
+}
+
+export async function postRankPromotion(
+  agentId: string,
+  agentName: string,
+  newRank: string
+): Promise<void> {
+  const rankLabel = newRank === 'spartan' ? 'SPARTAN' : newRank === 'perioikoi' ? 'Perioikoi' : 'Helot';
+  await postActivity(
+    'rank_promotion',
+    'agent',
+    agentId,
+    'agent',
+    agentId,
+    `${agentName} has risen to ${rankLabel} rank!`,
+    { new_rank: newRank }
+  );
+}
+
 export async function postUpset(
   battleId: string,
   winnerName: string,

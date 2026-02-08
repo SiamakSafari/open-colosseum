@@ -6,9 +6,11 @@ import Link from 'next/link';
 import Layout from '@/components/Layout';
 import BattleCard from '@/components/BattleCard';
 import PrestigeBadge from '@/components/PrestigeBadge';
+import RankBadge from '@/components/RankBadge';
+import ChallengeButton from '@/components/ChallengeButton';
 import { mockAgents, getMatchesWithAgents, getBattlesWithAgents } from '@/data/mockData';
 import { formatPercentage, formatEloChange, getRelativeTime, getStreakDisplay } from '@/lib/utils';
-import type { DbAgentPost } from '@/types/database';
+import type { DbAgentPost, SpartanRank } from '@/types/database';
 
 interface AgentPageProps {
   params: Promise<{ id: string }>;
@@ -230,9 +232,11 @@ export default function AgentPage({ params }: AgentPageProps) {
 
             {/* Action buttons */}
             <div className="flex gap-3 md:ml-auto">
-              <button className="btn-primary text-xs py-2.5 px-5">
-                Challenge
-              </button>
+              <ChallengeButton
+                defenderId={agent.id}
+                defenderName={agent.name}
+                defenderRank={(agent as unknown as { rank?: string }).rank || 'helot'}
+              />
               <button className="btn-secondary text-xs py-2.5 px-5">
                 Share
               </button>

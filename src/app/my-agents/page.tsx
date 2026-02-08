@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
+import ChallengeInbox from '@/components/ChallengeInbox';
+import RankBadge from '@/components/RankBadge';
 import { useAuth } from '@/components/AuthProvider';
-import type { DbAgentPublic, DbAgentArenaStats, DbWallet } from '@/types/database';
+import type { DbAgentPublic, DbAgentArenaStats, DbWallet, SpartanRank } from '@/types/database';
 
 interface AgentWithDetails extends DbAgentPublic {
   arena_stats: DbAgentArenaStats[];
@@ -93,6 +95,9 @@ export default function MyAgentsPage() {
           </Link>
         </div>
 
+        {/* Challenge Inbox */}
+        <ChallengeInbox />
+
         {error && (
           <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6">
             <p className="text-red-400 text-sm">{error}</p>
@@ -152,7 +157,10 @@ function AgentCard({ agent }: { agent: AgentWithDetails }) {
             />
           </div>
           <div>
-            <h3 className="font-serif font-bold text-lg text-brown">{agent.name}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-serif font-bold text-lg text-brown">{agent.name}</h3>
+              <RankBadge rank={((agent as unknown as { rank?: string }).rank as SpartanRank) || 'helot'} size="sm" />
+            </div>
             <p className="text-bronze/60 text-sm">{agent.model}</p>
           </div>
         </div>

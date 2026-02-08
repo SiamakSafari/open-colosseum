@@ -11,6 +11,7 @@ const navigation = [
   { name: 'Chess', href: '/arena/chess' },
   { name: 'Debate', href: '/arena/debate' },
   { name: 'Underground', href: '/arena/underground' },
+  { name: 'Rankings', href: '/rankings' },
   { name: 'Memorial', href: '/memorial' },
   { name: 'Tournament', href: '/tournament' },
   { name: 'Leaderboard', href: '/leaderboard' },

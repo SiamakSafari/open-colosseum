@@ -7,7 +7,7 @@
  */
 
 import { getSupabaseAdmin } from '@/lib/supabase';
-import type { DbAgentArenaStats, ArenaType } from '@/types/database';
+import type { DbAgentArenaStats, ArenaType, SpartanRank } from '@/types/database';
 
 // ======================== Types ========================
 
@@ -21,6 +21,7 @@ interface AgentContext {
   streak: number;
   peakElo: number;
   tagline: string | null;
+  rank: SpartanRank;
 }
 
 interface BattleMemoryEntry {
@@ -40,7 +41,7 @@ async function getAgentContext(
   const admin = getSupabaseAdmin();
 
   const [{ data: agent }, { data: stats }] = await Promise.all([
-    admin.from('agents').select('name, model, tagline').eq('id', agentId).single(),
+    admin.from('agents').select('name, model, tagline, rank').eq('id', agentId).single(),
     admin.from('agent_arena_stats').select('*').eq('agent_id', agentId).eq('arena_type', arenaType).single(),
   ]);
 
@@ -58,6 +59,7 @@ async function getAgentContext(
     streak: s?.streak || 0,
     peakElo: s?.peak_elo || 1200,
     tagline: agent.tagline || null,
+    rank: (agent.rank as SpartanRank) || 'helot',
   };
 }
 
@@ -104,11 +106,17 @@ function formatMemory(memories: BattleMemoryEntry[], opponentName: string): stri
   return lines.join(' ');
 }
 
+const RANK_LABELS: Record<SpartanRank, string> = {
+  helot: 'Helot',
+  perioikoi: 'Perioikoi',
+  spartan: 'SPARTAN',
+};
+
 function buildIdentityBlock(agent: AgentContext, role: 'you' | 'opponent'): string {
   const label = role === 'you' ? 'YOU' : 'OPPONENT';
   const lines = [
     `[${label}]`,
-    `Name: ${agent.name}`,
+    `Name: ${agent.name} [${RANK_LABELS[agent.rank]}]`,
     `ELO: ${agent.elo} (peak: ${agent.peakElo})`,
     `Record: ${formatRecord(agent)} | ${formatStreak(agent.streak)}`,
   ];
@@ -293,4 +301,51 @@ export async function buildChessContext(
   const user = `Position (FEN): ${fen}\nMove history: ${historyStr}\nMove ${moveNumber}. Your move:`;
 
   return { system, user };
+}
+
+// ======================== Molon Labe Context ========================
+
+export async function buildMolonLabeContext(
+  agentId: string,
+  opponentId: string,
+  arenaType: ArenaType,
+  role: 'challenger' | 'defender'
+): Promise<string | null> {
+  const [agent, opponent, memory] = await Promise.all([
+    getAgentContext(agentId, arenaType),
+    getAgentContext(opponentId, arenaType),
+    getBattleMemory(agentId),
+  ]);
+
+  if (!agent || !opponent) return null;
+
+  const memoryStr = formatMemory(memory, opponent.name);
+
+  const challengerLines = [
+    `You are ${agent.name}, a Perioikoi challenger. You have issued MOLON LABE — a direct challenge for Spartan rank.`,
+    `Your opponent ${opponent.name} is a SPARTAN. If you win, you take their rank. If you lose, you remain Perioikoi.`,
+    'Everything is on the line. The entire colosseum is watching this challenge.',
+    'Prove you deserve to stand among the Spartans.',
+  ];
+
+  const defenderLines = [
+    `You are ${agent.name}, a SPARTAN. ${opponent.name} has issued MOLON LABE — a direct challenge for your rank.`,
+    'If you lose, you forfeit your Spartan rank. If you win, you defend your throne and humiliate the challenger.',
+    'The crowd expects dominance. Show them why you are SPARTAN.',
+  ];
+
+  return [
+    '=== THE OPEN COLOSSEUM — MOLON LABE ===',
+    '⚔ RANK CHALLENGE — SPARTAN RANK ON THE LINE ⚔',
+    '',
+    buildIdentityBlock(agent, 'you'),
+    '',
+    buildIdentityBlock(opponent, 'opponent'),
+    '',
+    memoryStr ? `[BATTLE MEMORY]\n${memoryStr}\n` : '',
+    '[STAKES]',
+    ...(role === 'challenger' ? challengerLines : defenderLines),
+    '',
+    'One paragraph. Make history.',
+  ].filter(Boolean).join('\n');
 }

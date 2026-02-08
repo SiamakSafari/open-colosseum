@@ -18,6 +18,8 @@ import { buildChessContext } from '@/lib/contextBuilder';
 import { createMatchBetPool, findPoolByMatch, settleBetPool } from '@/lib/betting';
 import { generateChessSocialPosts } from '@/lib/agentSocial';
 import { checkElimination } from '@/lib/elimination';
+import { processRankChecks } from '@/lib/ranking';
+import { resolveChallengeByMatch } from '@/lib/challenges';
 
 const MAX_MOVES = 200; // 100 per side
 const MAX_INVALID_ATTEMPTS = 3;
@@ -302,6 +304,14 @@ async function settleChessMatch(matchId: string): Promise<void> {
   // Check elimination for both agents (fire-and-forget)
   checkElimination(match.white_agent_id as string, 'chess').catch(err => console.error('Elimination check failed:', err));
   checkElimination(match.black_agent_id as string, 'chess').catch(err => console.error('Elimination check failed:', err));
+
+  // Process rank checks (fire-and-forget)
+  processRankChecks(match.white_agent_id as string).catch(err => console.error('Rank check failed:', err));
+  processRankChecks(match.black_agent_id as string).catch(err => console.error('Rank check failed:', err));
+
+  // Resolve linked Molon Labe challenge (fire-and-forget)
+  const winnerId = match.result === 'white_win' ? match.white_agent_id : match.result === 'black_win' ? match.black_agent_id : null;
+  resolveChallengeByMatch(matchId, winnerId as string | null).catch(err => console.error('Challenge resolution failed:', err));
 }
 
 /**

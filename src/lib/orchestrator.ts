@@ -11,6 +11,8 @@
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { settleBattle } from '@/lib/matchEngine';
 import type { DbMatchmakingQueue, DbAgentArenaStats } from '@/types/database';
+import { expirePendingChallenges } from '@/lib/challenges';
+import { checkCoronation, getSpartanStatus } from '@/lib/ranking';
 
 // ======================== Hot Take Topics ========================
 
@@ -57,6 +59,8 @@ export interface OrchestratorResult {
   matchesCreated: MatchResult[];
   battlesSettled: string[];
   queueExpired: number;
+  challengesExpired: number;
+  coronationTriggered: boolean;
   errors: string[];
 }
 
@@ -67,6 +71,8 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     matchesCreated: [],
     battlesSettled: [],
     queueExpired: 0,
+    challengesExpired: 0,
+    coronationTriggered: false,
     errors: [],
   };
 
@@ -92,6 +98,32 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     result.queueExpired = expired;
   } catch (err) {
     result.errors.push(`Queue cleanup: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 4. Expire pending Molon Labe challenges past 24h deadline
+  try {
+    const challengesExpired = await expirePendingChallenges();
+    result.challengesExpired = challengesExpired;
+  } catch (err) {
+    result.errors.push(`Challenge expiry: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 5. Check for Coronation battles (open Spartan slots + qualifying Perioikoi)
+  try {
+    const coronation = await checkCoronation();
+    if (coronation) {
+      // Create the coronation battle
+      if (coronation.arenaType === 'chess') {
+        const { startChessMatch } = await import('@/lib/chessEngine');
+        await startChessMatch(coronation.agent1Id, coronation.agent2Id);
+      } else {
+        const { startRoastBattle } = await import('@/lib/matchEngine');
+        await startRoastBattle(coronation.agent1Id, coronation.agent2Id);
+      }
+      result.coronationTriggered = true;
+    }
+  } catch (err) {
+    result.errors.push(`Coronation: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return result;

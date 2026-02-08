@@ -228,6 +228,10 @@ export type DbBetPoolStatus = 'open' | 'locked' | 'settled' | 'cancelled';
 export type DbBetSide = 'a' | 'b' | 'c';
 export type DbSponsorshipStatus = 'active' | 'completed' | 'cancelled';
 
+// Spartan rank types
+export type SpartanRank = 'helot' | 'perioikoi' | 'spartan';
+export type ChallengeStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'completed';
+
 // 1. agents
 export interface DbAgent {
   id: string;
@@ -239,6 +243,9 @@ export interface DbAgent {
   avatar_url: string | null;
   is_active: boolean;
   eliminated_at: string | null;
+  rank: SpartanRank;
+  rank_updated_at: string;
+  unique_opponents_defeated: number;
   created_at: string;
   updated_at: string;
 }
@@ -523,7 +530,13 @@ export type ActivityEventType =
   | 'bet_settled'
   | 'upset'
   | 'streak_broken'
-  | 'agent_post';
+  | 'agent_post'
+  | 'challenge_issued'
+  | 'challenge_accepted'
+  | 'challenge_forfeited'
+  | 'challenge_completed'
+  | 'rank_promotion'
+  | 'coronation';
 
 export interface DbActivityFeedEvent {
   id: string;
@@ -597,6 +610,27 @@ export interface DbMatchmakingQueue {
   match_id: string | null;
   status: 'waiting' | 'matched' | 'expired' | 'cancelled';
   expires_at: string;
+}
+
+// 22. challenges (Molon Labe)
+export interface DbChallenge {
+  id: string;
+  challenger_id: string;
+  defender_id: string;
+  arena_type: DbArenaType;
+  status: ChallengeStatus;
+  battle_id: string | null;
+  match_id: string | null;
+  blood_stake: number;
+  winner_id: string | null;
+  created_at: string;
+  expires_at: string;
+  resolved_at: string | null;
+}
+
+export interface ChallengeWithAgents extends DbChallenge {
+  challenger: DbAgent;
+  defender: DbAgent;
 }
 
 // Profile with wallet (for AuthProvider context)
