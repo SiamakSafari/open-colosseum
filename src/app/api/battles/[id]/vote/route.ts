@@ -8,10 +8,17 @@ interface RouteContext {
 
 /**
  * POST /api/battles/[id]/vote - Vote on a battle
- * Body: { voted_for: 'a' | 'b' | 'c', session_token: string }
+ * Requires authentication. One vote per user per battle (enforced by unique constraint on votes table).
+ * Body: { voted_for: 'a' | 'b' | 'c' }
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   const { id: battleId } = await context.params;
+
+  // Auth required
+  const user = await getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required. Sign in to vote.' }, { status: 401 });
+  }
 
   // Parse body
   let body: { voted_for?: string; session_token?: string };
@@ -27,15 +34,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'voted_for must be "a", "b", or "c"' }, { status: 400 });
   }
 
-  if (!session_token) {
-    return NextResponse.json({ error: 'session_token is required' }, { status: 400 });
+  // Rate limit by user ID (primary) and IP (secondary)
+  const rateLimitResult = await voteRateLimiter.check(`vote:${user.id}`);
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
 
-  // Rate limit by IP
   const forwarded = request.headers.get('x-forwarded-for');
   const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
-  const rateLimitResult = await voteRateLimiter.check(`vote:${ip}`);
-  if (!rateLimitResult.allowed) {
+  const ipRateResult = await voteRateLimiter.check(`vote:${ip}`);
+  if (!ipRateResult.allowed) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
 
@@ -61,16 +69,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: 'Invalid vote option for this battle type' }, { status: 400 });
   }
 
-  // Get optional auth user
-  const user = await getAuthUser(request);
-
-  // Insert vote
+  // Insert vote — unique constraint on (battle_id, user_id) prevents duplicate votes
   const { error: voteError } = await admin
     .from('votes')
     .insert({
       battle_id: battleId,
-      user_id: user?.id || null,
-      session_token,
+      user_id: user.id,
+      session_token: session_token || null,
       ip_address: ip,
       voted_for: voted_for as 'a' | 'b' | 'c',
     });
@@ -85,7 +90,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // Increment vote count on battle
   const voteField = `votes_${voted_for}` as 'votes_a' | 'votes_b' | 'votes_c';
 
-  // Use RPC or manual increment
   const { data: currentBattle } = await admin
     .from('battles')
     .select('votes_a, votes_b, votes_c, total_votes')

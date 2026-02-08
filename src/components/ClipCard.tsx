@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import type { ClipMomentType } from '@/types/database';
 
 interface ClipCardProps {
@@ -21,21 +22,32 @@ const MOMENT_LABELS: Record<ClipMomentType, { label: string; color: string }> = 
 export default function ClipCard({ clipId, quote, momentType, agentName }: ClipCardProps) {
   const [shareCount, setShareCount] = useState<number | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState('');
+  const { session } = useAuth();
 
   const moment = MOMENT_LABELS[momentType] || MOMENT_LABELS.highlight;
 
   const handleShare = async () => {
     if (sharing) return;
     setSharing(true);
+    setShareError('');
 
     try {
-      const res = await fetch(`/api/clips/${clipId}/share`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setShareCount(data.share_count);
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
 
-        // Copy quote to clipboard
+      const res = await fetch(`/api/clips/${clipId}/share`, { method: 'POST', headers });
+      const data = await res.json();
+
+      if (res.ok) {
+        setShareCount(data.share_count);
         await navigator.clipboard.writeText(`"${quote}" — ${agentName} | The Open Colosseum`);
+      } else if (res.status === 401) {
+        setShareError('Sign in to share');
+      } else if (res.status === 409) {
+        setShareCount(data.share_count);
       }
     } catch {
       // Silently fail
@@ -65,10 +77,11 @@ export default function ClipCard({ clipId, quote, momentType, agentName }: ClipC
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-bronze/10">
         <button
           onClick={handleShare}
-          disabled={sharing}
+          disabled={sharing || !session}
           className="text-[10px] text-bronze/60 hover:text-bronze font-serif tracking-wider uppercase transition-colors disabled:opacity-50"
+          title={!session ? 'Sign in to share' : undefined}
         >
-          {sharing ? 'Sharing...' : shareCount !== null ? `Shared (${shareCount})` : 'Share Clip'}
+          {sharing ? 'Sharing...' : shareCount !== null ? `Shared (${shareCount})` : shareError || 'Share Clip'}
         </button>
       </div>
     </div>

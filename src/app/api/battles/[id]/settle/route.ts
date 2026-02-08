@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, getAuthUser } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { settleBattle } from '@/lib/matchEngine';
 
 // Must use Node.js runtime for crypto operations (decrypting agent keys in matchEngine)
@@ -11,14 +11,23 @@ interface RouteContext {
 
 /**
  * POST /api/battles/[id]/settle - Settle a battle (close voting, determine winner, update ELO)
+ * Auth: CRON_SECRET only. This endpoint is reserved for the orchestrator cron.
+ * Users cannot manually trigger settlement.
  */
 export async function POST(request: Request, context: RouteContext) {
   const { id: battleId } = await context.params;
 
-  // Auth check - only authenticated users can settle
-  const user = await getAuthUser(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  // Only the orchestrator (via CRON_SECRET) can settle battles
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
+
+  const token = authHeader?.replace('Bearer ', '');
+  if (token !== cronSecret) {
+    return NextResponse.json({ error: 'Unauthorized. Settlement is handled automatically.' }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();
@@ -38,8 +47,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: `Battle is not in voting state (current: ${battle.status})` }, { status: 400 });
   }
 
-  // Allow settlement if voting deadline has passed, or if manually triggered
-  // (For now, allow any authenticated user to settle after deadline)
+  // Verify voting deadline has passed
   if (battle.voting_deadline) {
     const deadline = new Date(battle.voting_deadline).getTime();
     if (Date.now() < deadline) {

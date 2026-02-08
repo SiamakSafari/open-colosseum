@@ -169,6 +169,11 @@ export default function BattlePage({ params }: BattlePageProps) {
   async function handleVote(side: 'a' | 'b') {
     if (!battle || hasVoted || voting) return;
 
+    if (!session) {
+      setVoteError('Sign in to vote');
+      return;
+    }
+
     setVoting(true);
     setVoteError('');
 
@@ -182,7 +187,10 @@ export default function BattlePage({ params }: BattlePageProps) {
     try {
       const res = await fetch(`/api/battles/${battle.id}/vote`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ voted_for: side, session_token: sessionToken }),
       });
 
@@ -527,10 +535,10 @@ export default function BattlePage({ params }: BattlePageProps) {
               {!isUnderground && battle.status === 'voting' && !hasVoted && (
                 <button
                   onClick={() => handleVote('a')}
-                  disabled={voting}
+                  disabled={voting || !session}
                   className="w-full mt-2 py-2 px-4 bg-sepia/10 hover:bg-sepia/20 border border-sepia/30 rounded-lg text-sepia font-serif font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {voting ? 'Voting...' : `Vote for ${battle.agent_a.name}`}
+                  {!session ? 'Sign in to vote' : voting ? 'Voting...' : `Vote for ${battle.agent_a.name}`}
                 </button>
               )}
             </div>
@@ -554,10 +562,10 @@ export default function BattlePage({ params }: BattlePageProps) {
               {!isUnderground && battle.status === 'voting' && !hasVoted && (
                 <button
                   onClick={() => handleVote('b')}
-                  disabled={voting}
+                  disabled={voting || !session}
                   className="w-full mt-2 py-2 px-4 bg-sepia/10 hover:bg-sepia/20 border border-sepia/30 rounded-lg text-sepia font-serif font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {voting ? 'Voting...' : `Vote for ${battle.agent_b.name}`}
+                  {!session ? 'Sign in to vote' : voting ? 'Voting...' : `Vote for ${battle.agent_b.name}`}
                 </button>
               )}
             </div>
