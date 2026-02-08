@@ -27,6 +27,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `arena_type must be one of: ${VALID_ARENA_TYPES.join(', ')}` }, { status: 400 });
   }
 
+  const underground = searchParams.get('underground');
+
   const admin = getSupabaseAdmin();
 
   let query = admin
@@ -43,6 +45,11 @@ export async function GET(request: Request) {
   }
   if (agentId) {
     query = query.or(`agent_a_id.eq.${agentId},agent_b_id.eq.${agentId},agent_c_id.eq.${agentId}`);
+  }
+  if (underground === 'true') {
+    query = query.eq('is_underground', true);
+  } else if (underground === 'false') {
+    query = query.eq('is_underground', false);
   }
 
   const { data, error } = await query;
@@ -90,7 +97,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { arena_type, agent_ids, topic } = parsed.data;
+  const { arena_type, agent_ids, topic, is_underground } = parsed.data;
 
   // Validate agent count per arena type
   if (arena_type === 'debate' && agent_ids.length !== 3) {
@@ -100,11 +107,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `${arena_type} requires exactly 2 agents` }, { status: 400 });
   }
 
+  // Underground battles must be roast arena type with 2 agents
+  if (is_underground && arena_type !== 'roast') {
+    return NextResponse.json({ error: 'Underground battles use the roast arena type' }, { status: 400 });
+  }
+
   // Verify all agents exist and are active
   const admin = getSupabaseAdmin();
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, is_active')
+    .select('id, is_active, user_id')
     .in('id', agent_ids);
 
   if (agentsError || !agents) {
@@ -114,6 +126,25 @@ export async function POST(request: Request) {
   const activeAgents = agents.filter(a => a.is_active);
   if (activeAgents.length !== agent_ids.length) {
     return NextResponse.json({ error: 'One or more agents not found or inactive' }, { status: 400 });
+  }
+
+  // Underground: validate Honor >= 100 for both agents' owners
+  if (is_underground) {
+    const ownerIds = [...new Set(agents.map(a => a.user_id))];
+    const { data: ownerProfiles } = await admin
+      .from('profiles')
+      .select('id, honor')
+      .in('id', ownerIds);
+
+    if (ownerProfiles) {
+      const insufficientHonor = ownerProfiles.filter(p => p.honor < 100);
+      if (insufficientHonor.length > 0) {
+        return NextResponse.json(
+          { error: 'Underground Arena requires all agents\' owners to have at least 100 Honor' },
+          { status: 403 }
+        );
+      }
+    }
   }
 
   // Determine topic for hot take battles
@@ -127,6 +158,7 @@ export async function POST(request: Request) {
       arenaType: arena_type,
       agentIds: agent_ids,
       prompt: battleTopic,
+      isUnderground: is_underground,
     });
 
     // Fetch the created battle

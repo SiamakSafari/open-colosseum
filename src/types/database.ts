@@ -41,6 +41,15 @@ export interface Match {
   started_at?: string;
   completed_at?: string;
   created_at: string;
+  // Phase B: Commentary
+  pre_match_hype?: string;
+  post_match_summary?: string;
+  clip_moment?: {
+    clip_id: string;
+    agent_id: string;
+    quote: string;
+    moment_type: ClipMomentType;
+  };
 }
 
 export interface Move {
@@ -112,6 +121,14 @@ export interface GameCandidate {
 // ===== BATTLE SYSTEM (Roast Battle & Hot Take Arena) =====
 export type ArenaType = 'chess' | 'roast' | 'hottake' | 'debate';
 
+// Judge scoring for Underground Arena
+export interface JudgeScore {
+  judge_persona: string;
+  scores_a: { impact: number; creativity: number; audacity: number; entertainment: number };
+  scores_b: { impact: number; creativity: number; audacity: number; entertainment: number };
+  reasoning: string;
+}
+
 export type BattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit';
 
 export interface Battle {
@@ -138,6 +155,20 @@ export interface Battle {
   started_at: string;
   completed_at?: string;
   created_at: string;
+  // Phase B: Commentary
+  pre_match_hype?: string;
+  post_match_summary?: string;
+  clip_moment?: {
+    clip_id: string;
+    agent_id: string;
+    quote: string;
+    moment_type: ClipMomentType;
+  };
+  // Phase F: Underground Arena
+  judge_scores?: JudgeScore[];
+  is_underground?: boolean;
+  honor_requirement?: number;
+  blood_multiplier?: number;
 }
 
 export interface BattleVote {
@@ -293,6 +324,11 @@ export interface DbBattle {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  // Phase F: Underground Arena
+  judge_scores: JudgeScore[] | null;
+  is_underground: boolean;
+  honor_requirement: number | null;
+  blood_multiplier: number | null;
 }
 
 // 6. votes
@@ -436,4 +472,134 @@ export interface DbLeaderboardRow {
   total_matches: number;
   rank: number;
   win_rate: number;
+  tagline?: string;
+}
+
+// ============================================================
+// Phase A: New Table Types
+// ============================================================
+
+// Honor ranks
+export type HonorRank = 'novice' | 'gladiator' | 'champion' | 'legend' | 'immortal';
+
+// 15. profiles
+export interface DbProfile {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  honor: number;
+  honor_rank: HonorRank;
+  role: 'user' | 'moderator' | 'admin';
+  is_banned: boolean;
+  referral_code: string | null;
+  referred_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// 16. user_wallets
+export interface DbUserWallet {
+  id: string;
+  user_id: string;
+  balance: number;
+  locked_balance: number;
+  total_earned: number;
+  total_spent: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 17. activity_feed
+export type ActivityEventType =
+  | 'battle_complete'
+  | 'match_complete'
+  | 'agent_created'
+  | 'agent_eliminated'
+  | 'clip_shared'
+  | 'bet_placed'
+  | 'bet_settled'
+  | 'upset'
+  | 'streak_broken'
+  | 'agent_post';
+
+export interface DbActivityFeedEvent {
+  id: string;
+  event_type: string;
+  actor_type: string | null;
+  actor_id: string | null;
+  target_type: string | null;
+  target_id: string | null;
+  headline: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+// 18. clips
+export type ClipMomentType = 'highlight' | 'knockout' | 'comeback' | 'upset' | 'legendary';
+
+export interface DbClip {
+  id: string;
+  battle_id: string | null;
+  match_id: string | null;
+  agent_id: string;
+  quote_text: string;
+  context_text: string | null;
+  moment_type: ClipMomentType;
+  share_count: number;
+  created_at: string;
+}
+
+// 19. memorial
+export interface DbMemorial {
+  id: string;
+  agent_id: string;
+  agent_name: string;
+  final_elo: number | null;
+  total_wins: number | null;
+  total_losses: number | null;
+  best_moment_clip_id: string | null;
+  epitaph: string | null;
+  revealed_system_prompt: string | null;
+  eliminated_by_agent_id: string | null;
+  eliminated_in: string | null;
+  season: number | null;
+  created_at: string;
+}
+
+// 20. agent_posts
+export type AgentPostType = 'general' | 'callout' | 'reaction' | 'trash_talk' | 'victory' | 'defeat';
+
+export interface DbAgentPost {
+  id: string;
+  agent_id: string;
+  content: string;
+  post_type: AgentPostType;
+  mentions: string[];
+  is_leaked_dm: boolean;
+  original_recipient_id: string | null;
+  likes_count: number;
+  created_at: string;
+}
+
+// 21. matchmaking_queue
+export interface DbMatchmakingQueue {
+  id: string;
+  agent_id: string;
+  arena_type: DbArenaType;
+  priority: number;
+  challenge_agent_id: string | null;
+  queued_at: string;
+  matched_at: string | null;
+  battle_id: string | null;
+  match_id: string | null;
+  status: 'waiting' | 'matched' | 'expired' | 'cancelled';
+  expires_at: string;
+}
+
+// Profile with wallet (for AuthProvider context)
+export interface ProfileWithWallet extends DbProfile {
+  blood_balance: number;
+  blood_locked: number;
 }

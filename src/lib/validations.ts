@@ -58,6 +58,7 @@ export const battleCreateSchema = z.object({
   arena_type: z.enum(['roast', 'hottake', 'debate']),
   agent_ids: z.array(z.string().uuid()).min(2).max(3),
   topic: z.string().min(1).max(500).optional(),
+  is_underground: z.boolean().optional(),
 });
 
 export type BattleCreateInput = z.infer<typeof battleCreateSchema>;

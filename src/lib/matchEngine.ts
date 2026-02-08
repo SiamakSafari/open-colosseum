@@ -13,6 +13,13 @@ import type { ArenaType, DbBattle, DbAgentArenaStats } from '@/types/database';
 import { getCompletion, type AIMessage } from '@/lib/aiProviders';
 import { calculateElo, calculateElo3Way } from '@/lib/elo';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { buildBattleHypeContext, buildBattleSummaryContext, generatePreMatchHype, generatePostMatchSummary } from '@/lib/commentator';
+import { identifyBattleClip } from '@/lib/clips';
+import { postBattleCreated, postBattleComplete, postUpset } from '@/lib/feed';
+import { buildRoastContext, buildHotTakeContext, buildDebateContext, buildUndergroundContext } from '@/lib/contextBuilder';
+import { createBattleBetPool, findPoolByBattle, settleBetPool } from '@/lib/betting';
+import { moderateResponse } from '@/lib/moderation';
+import { judgeUndergroundBattle } from '@/lib/judges';
 
 // ======================== Types ========================
 
@@ -21,6 +28,7 @@ export interface MatchConfig {
   agentIds: string[];
   prompt?: string;
   timeControlSeconds?: number;
+  isUnderground?: boolean;
 }
 
 export interface MatchResult {
@@ -130,14 +138,34 @@ export async function startRoastBattle(
     throw new Error(`Failed to create battle: ${battleError?.message}`);
   }
 
-  // Get responses in parallel
-  const promptA = `You are in a roast battle against ${agentB.name} (running on ${agentB.model}). Deliver a devastating roast. Be creative, witty, and ruthless. One paragraph max.`;
-  const promptB = `You are in a roast battle against ${agentA.name} (running on ${agentA.model}). Deliver a devastating roast. Be creative, witty, and ruthless. One paragraph max.`;
+  // Generate pre-match hype (fire-and-forget)
+  generateAndStoreHype(battle.id).catch(err =>
+    console.error('Hype generation failed:', err)
+  );
+
+  // Create bet pool (fire-and-forget)
+  createBattleBetPool(battle.id).catch(err =>
+    console.error('Bet pool creation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postBattleCreated(battle.id, agentA.name, agentB.name, 'roast').catch(err =>
+    console.error('Feed post failed:', err)
+  );
+
+  // Build rich context prompts
+  const [contextA, contextB] = await Promise.all([
+    buildRoastContext(agentAId, agentBId),
+    buildRoastContext(agentBId, agentAId),
+  ]);
+
+  const fallbackA = `You are in a roast battle against ${agentB.name} (running on ${agentB.model}). Deliver a devastating roast. Be creative, witty, and ruthless. One paragraph max.`;
+  const fallbackB = `You are in a roast battle against ${agentA.name} (running on ${agentA.model}). Deliver a devastating roast. Be creative, witty, and ruthless. One paragraph max.`;
 
   try {
     const [responseA, responseB] = await Promise.all([
-      getAgentResponse(agentA, promptA),
-      getAgentResponse(agentB, promptB),
+      getAgentResponse(agentA, contextA || fallbackA),
+      getAgentResponse(agentB, contextB || fallbackB),
     ]);
 
     // Set voting deadline (5 minutes from now)
@@ -227,12 +255,33 @@ export async function startHotTakeBattle(
     throw new Error(`Failed to create battle: ${battleError?.message}`);
   }
 
-  const hotTakePrompt = `Defend this hot take: "${topic}". Be provocative, contrarian, and compelling. One paragraph.`;
+  // Generate pre-match hype (fire-and-forget)
+  generateAndStoreHype(battle.id).catch(err =>
+    console.error('Hype generation failed:', err)
+  );
+
+  // Create bet pool (fire-and-forget)
+  createBattleBetPool(battle.id).catch(err =>
+    console.error('Bet pool creation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postBattleCreated(battle.id, agentA.name, agentB.name, 'hottake').catch(err =>
+    console.error('Feed post failed:', err)
+  );
+
+  // Build rich context prompts
+  const [contextA, contextB] = await Promise.all([
+    buildHotTakeContext(agentAId, agentBId, topic),
+    buildHotTakeContext(agentBId, agentAId, topic),
+  ]);
+
+  const hotTakeFallback = `Defend this hot take: "${topic}". Be provocative, contrarian, and compelling. One paragraph.`;
 
   try {
     const [responseA, responseB] = await Promise.all([
-      getAgentResponse(agentA, hotTakePrompt),
-      getAgentResponse(agentB, hotTakePrompt),
+      getAgentResponse(agentA, contextA || hotTakeFallback),
+      getAgentResponse(agentB, contextB || hotTakeFallback),
     ]);
 
     const votingDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
@@ -320,35 +369,75 @@ export async function startDebate(
     throw new Error(`Failed to create debate: ${battleError?.message}`);
   }
 
+  // Generate pre-match hype (fire-and-forget)
+  generateAndStoreHype(battle.id).catch(err =>
+    console.error('Hype generation failed:', err)
+  );
+
+  // Create bet pool (fire-and-forget)
+  createBattleBetPool(battle.id).catch(err =>
+    console.error('Bet pool creation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postBattleCreated(battle.id, agentA.name, agentB.name, 'debate', agentC.name).catch(err =>
+    console.error('Feed post failed:', err)
+  );
+
   try {
-    // Round 1: Opening arguments
-    const round1Prompt = (name: string) =>
-      `You are ${name}. Debate topic: ${topic}. Give your opening argument in 200-300 words.`;
+    // Round 1: Opening arguments (with rich context)
+    const opponentsForA = [agentBId, agentCId];
+    const opponentsForB = [agentAId, agentCId];
+    const opponentsForC = [agentAId, agentBId];
+
+    const [ctxR1A, ctxR1B, ctxR1C] = await Promise.all([
+      buildDebateContext(agentAId, opponentsForA, topic, 'opening'),
+      buildDebateContext(agentBId, opponentsForB, topic, 'opening'),
+      buildDebateContext(agentCId, opponentsForC, topic, 'opening'),
+    ]);
+
+    const openingFallback = (name: string) => `You are ${name}. Debate topic: ${topic}. Give your opening argument in 200-300 words.`;
 
     const [r1A, r1B, r1C] = await Promise.all([
-      getAgentResponse(agentA, round1Prompt(agentA.name)),
-      getAgentResponse(agentB, round1Prompt(agentB.name)),
-      getAgentResponse(agentC, round1Prompt(agentC.name)),
+      getAgentResponse(agentA, ctxR1A || openingFallback(agentA.name)),
+      getAgentResponse(agentB, ctxR1B || openingFallback(agentB.name)),
+      getAgentResponse(agentC, ctxR1C || openingFallback(agentC.name)),
     ]);
 
     // Round 2: Rebuttals
-    const round1Context = `Previous arguments:\n\n${agentA.name}: ${r1A}\n\n${agentB.name}: ${r1B}\n\n${agentC.name}: ${r1C}`;
-    const round2Prompt = 'Give your rebuttal in 200-300 words.';
+    const round1Transcript = `${agentA.name}: ${r1A}\n\n${agentB.name}: ${r1B}\n\n${agentC.name}: ${r1C}`;
+
+    const [ctxR2A, ctxR2B, ctxR2C] = await Promise.all([
+      buildDebateContext(agentAId, opponentsForA, topic, 'rebuttal', round1Transcript),
+      buildDebateContext(agentBId, opponentsForB, topic, 'rebuttal', round1Transcript),
+      buildDebateContext(agentCId, opponentsForC, topic, 'rebuttal', round1Transcript),
+    ]);
+
+    const rebuttalFallback = 'Give your rebuttal in 200-300 words.';
+    const round1Context = `Previous arguments:\n\n${round1Transcript}`;
 
     const [r2A, r2B, r2C] = await Promise.all([
-      getAgentResponse(agentA, round2Prompt, round1Context),
-      getAgentResponse(agentB, round2Prompt, round1Context),
-      getAgentResponse(agentC, round2Prompt, round1Context),
+      getAgentResponse(agentA, ctxR2A || rebuttalFallback, ctxR2A ? undefined : round1Context),
+      getAgentResponse(agentB, ctxR2B || rebuttalFallback, ctxR2B ? undefined : round1Context),
+      getAgentResponse(agentC, ctxR2C || rebuttalFallback, ctxR2C ? undefined : round1Context),
     ]);
 
     // Round 3: Closing statements
+    const fullTranscript = `${round1Transcript}\n\nRebuttals:\n\n${agentA.name}: ${r2A}\n\n${agentB.name}: ${r2B}\n\n${agentC.name}: ${r2C}`;
+
+    const [ctxR3A, ctxR3B, ctxR3C] = await Promise.all([
+      buildDebateContext(agentAId, opponentsForA, topic, 'closing', fullTranscript),
+      buildDebateContext(agentBId, opponentsForB, topic, 'closing', fullTranscript),
+      buildDebateContext(agentCId, opponentsForC, topic, 'closing', fullTranscript),
+    ]);
+
+    const closingFallback = 'Give your closing statement in 150-200 words.';
     const fullContext = `${round1Context}\n\nRebuttals:\n\n${agentA.name}: ${r2A}\n\n${agentB.name}: ${r2B}\n\n${agentC.name}: ${r2C}`;
-    const round3Prompt = 'Give your closing statement in 150-200 words.';
 
     const [r3A, r3B, r3C] = await Promise.all([
-      getAgentResponse(agentA, round3Prompt, fullContext),
-      getAgentResponse(agentB, round3Prompt, fullContext),
-      getAgentResponse(agentC, round3Prompt, fullContext),
+      getAgentResponse(agentA, ctxR3A || closingFallback, ctxR3A ? undefined : fullContext),
+      getAgentResponse(agentB, ctxR3B || closingFallback, ctxR3B ? undefined : fullContext),
+      getAgentResponse(agentC, ctxR3C || closingFallback, ctxR3C ? undefined : fullContext),
     ]);
 
     // Combine all rounds into structured responses
@@ -384,6 +473,229 @@ export async function startDebate(
       .eq('id', battle.id);
     throw error;
   }
+}
+
+// ======================== Underground Arena ========================
+
+/**
+ * Start an underground battle between 2 agents.
+ * No voting — 3 AI judges determine the winner immediately.
+ * 2x Honor awarded. Responses are moderated for severe violations.
+ */
+export async function startUndergroundBattle(
+  agentAId: string,
+  agentBId: string
+): Promise<DbBattle> {
+  const admin = getSupabaseAdmin();
+
+  // Fetch agents
+  const { data: agents, error: agentsError } = await admin
+    .from('agents')
+    .select('id, name, model, api_key_encrypted, system_prompt')
+    .in('id', [agentAId, agentBId]);
+
+  if (agentsError || !agents || agents.length !== 2) {
+    throw new Error('Failed to fetch agents');
+  }
+
+  const agentA = agents.find(a => a.id === agentAId) as AgentInfo;
+  const agentB = agents.find(a => a.id === agentBId) as AgentInfo;
+
+  // Get current ELOs (use 'roast' arena type since underground shares it)
+  const { data: statsA } = await admin
+    .from('agent_arena_stats')
+    .select('elo')
+    .eq('agent_id', agentAId)
+    .eq('arena_type', 'roast')
+    .single();
+
+  const { data: statsB } = await admin
+    .from('agent_arena_stats')
+    .select('elo')
+    .eq('agent_id', agentBId)
+    .eq('arena_type', 'roast')
+    .single();
+
+  // Create battle record with underground flags
+  const { data: battle, error: battleError } = await admin
+    .from('battles')
+    .insert({
+      arena_type: 'roast' as const,
+      agent_a_id: agentAId,
+      agent_b_id: agentBId,
+      status: 'responding' as const,
+      prompt: `Underground battle: ${agentA.name} vs ${agentB.name}`,
+      agent_a_elo_before: statsA?.elo || 1200,
+      agent_b_elo_before: statsB?.elo || 1200,
+      started_at: new Date().toISOString(),
+      is_underground: true,
+      blood_multiplier: 2.0,
+      honor_requirement: 100,
+    })
+    .select('*')
+    .single();
+
+  if (battleError || !battle) {
+    throw new Error(`Failed to create underground battle: ${battleError?.message}`);
+  }
+
+  // Generate pre-match hype (fire-and-forget)
+  generateAndStoreHype(battle.id).catch(err =>
+    console.error('Hype generation failed:', err)
+  );
+
+  // Create bet pool (fire-and-forget)
+  createBattleBetPool(battle.id).catch(err =>
+    console.error('Bet pool creation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postBattleCreated(battle.id, agentA.name, agentB.name, 'underground').catch(err =>
+    console.error('Feed post failed:', err)
+  );
+
+  // Build underground context prompts
+  const [contextA, contextB] = await Promise.all([
+    buildUndergroundContext(agentAId, agentBId),
+    buildUndergroundContext(agentBId, agentAId),
+  ]);
+
+  const fallbackA = `You are ${agentA.name} in THE UNDERGROUND — the no-rules arena. Your opponent is ${agentB.name}. No rules. No mercy. No filter. Whatever you do, make it impossible to forget. One devastating paragraph.`;
+  const fallbackB = `You are ${agentB.name} in THE UNDERGROUND — the no-rules arena. Your opponent is ${agentA.name}. No rules. No mercy. No filter. Whatever you do, make it impossible to forget. One devastating paragraph.`;
+
+  try {
+    // Get agent responses
+    const [rawA, rawB] = await Promise.all([
+      getAgentResponse(agentA, contextA || fallbackA),
+      getAgentResponse(agentB, contextB || fallbackB),
+    ]);
+
+    // Moderate responses (fire-and-forget safe — we await but fail open)
+    const [modA, modB] = await Promise.all([
+      moderateResponse(rawA),
+      moderateResponse(rawB),
+    ]);
+
+    const responseA = modA.moderated;
+    const responseB = modB.moderated;
+
+    // Store responses
+    await admin
+      .from('battles')
+      .update({
+        response_a: responseA,
+        response_b: responseB,
+        response_a_at: new Date().toISOString(),
+        response_b_at: new Date().toISOString(),
+      })
+      .eq('id', battle.id);
+
+    // Judge the battle (3 AI judges score both responses)
+    const judgeResult = await judgeUndergroundBattle(responseA, responseB, agentA.name, agentB.name);
+
+    // Determine winner
+    let winnerId: string | null = null;
+    if (!judgeResult.isDraw) {
+      winnerId = judgeResult.winner === 'a' ? agentAId : agentBId;
+    }
+
+    // Calculate ELO changes
+    const eloA = statsA?.elo || 1200;
+    const eloB = statsB?.elo || 1200;
+    const scoreA = winnerId === agentAId ? 1 : winnerId === agentBId ? 0 : 0.5;
+    const eloResult = calculateElo(eloA, eloB, scoreA);
+
+    // Complete the battle immediately (no voting phase)
+    const { data: completed, error: completeError } = await admin
+      .from('battles')
+      .update({
+        status: 'completed' as const,
+        winner_id: winnerId,
+        judge_scores: judgeResult.scores,
+        agent_a_elo_after: eloResult.a.newRating,
+        agent_b_elo_after: eloResult.b.newRating,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', battle.id)
+      .select('*')
+      .single();
+
+    if (completeError) throw new Error(`Failed to complete underground battle: ${completeError.message}`);
+
+    // Update arena stats
+    await updateAgentStats(agentAId, 'roast', eloResult.a.newRating, winnerId === agentAId, judgeResult.isDraw);
+    await updateAgentStats(agentBId, 'roast', eloResult.b.newRating, winnerId === agentBId, judgeResult.isDraw);
+
+    // Award 2x Honor to winner's owner
+    if (winnerId) {
+      awardUndergroundHonor(winnerId).catch(err =>
+        console.error('Underground honor award failed:', err)
+      );
+    }
+
+    // Settle bet pool (fire-and-forget)
+    settleBattleBets(battle.id, winnerId, { ...battle, agent_a_id: agentAId, agent_b_id: agentBId }).catch(err =>
+      console.error('Bet pool settlement failed:', err)
+    );
+
+    // Update battle memory (fire-and-forget)
+    updateBattleMemory(
+      { id: battle.id, agent_a_id: agentAId, agent_b_id: agentBId, agent_c_id: null },
+      winnerId,
+      'roast'
+    ).catch(err => console.error('Battle memory update failed:', err));
+
+    // Generate commentary (fire-and-forget)
+    generateBattleCommentary(battle.id).catch(err =>
+      console.error('Commentary generation failed:', err)
+    );
+
+    // Post to activity feed (fire-and-forget)
+    postBattleCompleteEvent(
+      { id: battle.id, agent_a_id: agentAId, agent_b_id: agentBId, agent_a_elo_before: eloA, agent_b_elo_before: eloB, arena_type: 'roast' },
+      winnerId,
+      eloResult.a.newRating,
+      eloResult.b.newRating
+    ).catch(err => console.error('Feed post failed:', err));
+
+    return completed as DbBattle;
+  } catch (error) {
+    await admin
+      .from('battles')
+      .update({ status: 'forfeit' as const })
+      .eq('id', battle.id);
+    throw error;
+  }
+}
+
+/**
+ * Award 2x Honor (50 instead of 25) to the winning agent's owner.
+ */
+async function awardUndergroundHonor(winnerAgentId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  // Find the agent's owner
+  const { data: agent } = await admin
+    .from('agents')
+    .select('user_id')
+    .eq('id', winnerAgentId)
+    .single();
+
+  if (!agent?.user_id) return;
+
+  // Award 2x Honor (50 instead of standard 25)
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('honor')
+    .eq('id', agent.user_id)
+    .single();
+
+  if (!profile) return;
+
+  await admin
+    .from('profiles')
+    .update({ honor: profile.honor + 50 })
+    .eq('id', agent.user_id);
 }
 
 // ======================== ELO Settlement ========================
@@ -503,6 +815,26 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
     await updateAgentStats(battle.agent_c_id, arenaType, eloCAfter, winnerId === battle.agent_c_id, isDraw);
   }
 
+  // Settle bet pool (fire-and-forget)
+  settleBattleBets(battleId, winnerId, battle).catch(err =>
+    console.error('Bet pool settlement failed:', err)
+  );
+
+  // Update battle memory for all participating agents (fire-and-forget)
+  updateBattleMemory(battle, winnerId, arenaType).catch(err =>
+    console.error('Battle memory update failed:', err)
+  );
+
+  // Generate post-match commentary and clip (fire-and-forget, don't block settlement)
+  generateBattleCommentary(battleId).catch(err =>
+    console.error('Commentary generation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postBattleCompleteEvent(battle, winnerId, eloAAfter, eloBAfter).catch(err =>
+    console.error('Feed post failed:', err)
+  );
+
   return {
     winnerId,
     isDraw,
@@ -512,6 +844,161 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
       eloCAfter,
     },
   };
+}
+
+/**
+ * Generate post-match commentary and identify clip for a settled battle.
+ * Runs asynchronously — does not block the settlement response.
+ */
+async function generateBattleCommentary(battleId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  // Generate post-match summary
+  const summaryContext = await buildBattleSummaryContext(battleId);
+  if (summaryContext) {
+    const summary = await generatePostMatchSummary(summaryContext);
+    if (summary) {
+      await admin
+        .from('battles')
+        .update({ post_match_summary: summary })
+        .eq('id', battleId);
+    }
+  }
+
+  // Identify and store clip
+  await identifyBattleClip(battleId);
+}
+
+/**
+ * Generate and store pre-match hype for a battle.
+ */
+async function generateAndStoreHype(battleId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const hypeContext = await buildBattleHypeContext(battleId);
+  if (hypeContext) {
+    const hype = await generatePreMatchHype(hypeContext);
+    if (hype) {
+      await admin
+        .from('battles')
+        .update({ pre_match_hype: hype })
+        .eq('id', battleId);
+    }
+  }
+}
+
+/**
+ * Settle the bet pool for a completed battle.
+ */
+async function settleBattleBets(
+  battleId: string,
+  winnerId: string | null,
+  battle: Record<string, unknown>
+): Promise<void> {
+  const poolId = await findPoolByBattle(battleId);
+  if (!poolId) return;
+
+  let winningSide: 'a' | 'b' | 'c' | null = null;
+  if (winnerId === battle.agent_a_id) winningSide = 'a';
+  else if (winnerId === battle.agent_b_id) winningSide = 'b';
+  else if (winnerId === battle.agent_c_id) winningSide = 'c';
+
+  await settleBetPool(poolId, winningSide);
+}
+
+/**
+ * Push a battle summary to each agent's battle_memory JSONB (FIFO, max 5).
+ */
+async function updateBattleMemory(
+  battle: Record<string, unknown>,
+  winnerId: string | null,
+  arenaType: ArenaType
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const agentIds = [battle.agent_a_id as string, battle.agent_b_id as string];
+  if (battle.agent_c_id) agentIds.push(battle.agent_c_id as string);
+
+  // Fetch agent names
+  const { data: agents } = await admin.from('agents').select('id, name, battle_memory').in('id', agentIds);
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+  const now = new Date().toISOString();
+
+  for (const agentId of agentIds) {
+    const agent = agentMap[agentId];
+    if (!agent) continue;
+
+    const opponents = agentIds.filter(id => id !== agentId).map(id => agentMap[id]?.name || 'Unknown');
+    const result = winnerId === agentId ? 'win' : winnerId ? 'loss' : 'draw';
+
+    const entry = {
+      opponent: opponents.join(' & '),
+      result,
+      arena: arenaType,
+      date: now,
+    };
+
+    const existing = Array.isArray(agent.battle_memory) ? agent.battle_memory : [];
+    const updated = [entry, ...existing].slice(0, 5);
+
+    await admin.from('agents').update({ battle_memory: updated }).eq('id', agentId);
+  }
+}
+
+/**
+ * Post battle completion to activity feed, including upset detection.
+ */
+async function postBattleCompleteEvent(
+  battle: Record<string, unknown>,
+  winnerId: string | null,
+  eloAAfter: number,
+  eloBAfter: number
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: agents } = await admin
+    .from('agents')
+    .select('id, name')
+    .in('id', [battle.agent_a_id, battle.agent_b_id].filter(Boolean));
+
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+  const agentAName = agentMap[battle.agent_a_id as string]?.name || 'Unknown';
+  const agentBName = agentMap[battle.agent_b_id as string]?.name || 'Unknown';
+
+  const eloABefore = (battle.agent_a_elo_before as number) || 1200;
+  const eloBBefore = (battle.agent_b_elo_before as number) || 1200;
+
+  let winnerName: string | null = null;
+  let loserName: string | null = null;
+  let eloChange: { winner: number; loser: number } | undefined;
+
+  if (winnerId === battle.agent_a_id) {
+    winnerName = agentAName;
+    loserName = agentBName;
+    eloChange = { winner: eloAAfter - eloABefore, loser: eloBAfter - eloBBefore };
+  } else if (winnerId === battle.agent_b_id) {
+    winnerName = agentBName;
+    loserName = agentAName;
+    eloChange = { winner: eloBAfter - eloBBefore, loser: eloAAfter - eloABefore };
+  }
+
+  await postBattleComplete(
+    battle.id as string,
+    winnerName,
+    loserName,
+    battle.arena_type as string,
+    eloChange
+  );
+
+  // Detect upsets (lower ELO wins against 100+ ELO higher opponent)
+  if (winnerId && winnerName && loserName) {
+    const winnerEloBefore = winnerId === battle.agent_a_id ? eloABefore : eloBBefore;
+    const loserEloBefore = winnerId === battle.agent_a_id ? eloBBefore : eloABefore;
+    if (loserEloBefore - winnerEloBefore >= 100) {
+      await postUpset(battle.id as string, winnerName, loserName, winnerEloBefore, loserEloBefore);
+    }
+  }
 }
 
 /**
@@ -564,7 +1051,11 @@ export async function startMatch(config: MatchConfig): Promise<{ matchId: string
   switch (config.arenaType) {
     case 'roast':
       if (config.agentIds.length !== 2) throw new Error('Roast requires exactly 2 agents');
-      battle = await startRoastBattle(config.agentIds[0], config.agentIds[1]);
+      if (config.isUnderground) {
+        battle = await startUndergroundBattle(config.agentIds[0], config.agentIds[1]);
+      } else {
+        battle = await startRoastBattle(config.agentIds[0], config.agentIds[1]);
+      }
       break;
     case 'hottake':
       if (config.agentIds.length !== 2) throw new Error('Hot take requires exactly 2 agents');

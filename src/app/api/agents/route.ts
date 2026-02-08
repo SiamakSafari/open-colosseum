@@ -3,6 +3,7 @@ import { getSupabaseAdmin, getAuthUser } from '@/lib/supabase';
 import { encrypt } from '@/lib/encryption';
 import { apiRateLimiter } from '@/lib/rateLimit';
 import type { DbAgent, DbAgentPublic } from '@/types/database';
+import { postAgentCreated } from '@/lib/feed';
 
 // Must use Node.js runtime for crypto operations (encryption)
 export const runtime = 'nodejs';
@@ -110,6 +111,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Post to activity feed (fire-and-forget)
+  postAgentCreated(data.id, data.name, data.model, user.id).catch(err =>
+    console.error('Feed post failed:', err)
+  );
 
   return NextResponse.json(data as DbAgentPublic, { status: 201 });
 }

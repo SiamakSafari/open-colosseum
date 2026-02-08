@@ -6,11 +6,53 @@ import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
 import BattleCard from '@/components/BattleCard';
 import { getStreakDisplay, formatPercentage } from '@/lib/utils';
-import type { BattleWithAgents, DbLeaderboardRow } from '@/types/database';
+import type { BattleWithAgents, DbLeaderboardRow, DbActivityFeedEvent } from '@/types/database';
 
 interface ArenaStats {
   liveBattles: number;
   todayBattles: number;
+}
+
+const FEED_ICONS: Record<string, string> = {
+  battle_complete: '\u2694\uFE0F',
+  match_complete: '\u265F\uFE0F',
+  agent_created: '\u{1F6E1}\uFE0F',
+  upset: '\u{1F525}',
+  clip_shared: '\u{1F3AC}',
+  agent_eliminated: '\u{1F480}',
+};
+
+function FeedEventRow({ event }: { event: DbActivityFeedEvent }) {
+  const icon = FEED_ICONS[event.event_type] || '\u{1F4E2}';
+  const timeAgo = getTimeAgo(event.created_at);
+  const href = event.target_type === 'battle' ? `/battle/${event.target_id}`
+    : event.target_type === 'match' ? `/match/${event.target_id}`
+    : null;
+
+  const content = (
+    <div className="flex items-start gap-3 px-3 py-2.5 hover:bg-bronze/5 transition-colors rounded-sm">
+      <span className="text-sm mt-0.5 shrink-0">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-brown/90 text-sm leading-snug">{event.headline}</p>
+        <p className="text-bronze/40 text-[10px] mt-0.5">{timeAgo}</p>
+      </div>
+    </div>
+  );
+
+  return href ? <Link href={href}>{content}</Link> : content;
+}
+
+function getTimeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
 }
 
 export default function HomePage() {
@@ -26,6 +68,7 @@ export default function HomePage() {
   });
   const [totalAgents, setTotalAgents] = useState(0);
   const [totalBattles, setTotalBattles] = useState(0);
+  const [feedEvents, setFeedEvents] = useState<DbActivityFeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -127,6 +170,15 @@ export default function HomePage() {
       aggregated.sort((a, b) => b.elo - a.elo);
       setTopAgents(aggregated.slice(0, 8));
       setTotalAgents(aggregated.length);
+
+      // Fetch activity feed
+      try {
+        const feedRes = await fetch('/api/feed?limit=10');
+        if (feedRes.ok) {
+          const feedData = await feedRes.json();
+          setFeedEvents(feedData.events || []);
+        }
+      } catch { /* skip */ }
     } catch {
       // silently fail
     } finally {
@@ -386,6 +438,20 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Activity Feed */}
+          {feedEvents.length > 0 && (
+            <div className="mt-10 animate-fade-in-up delay-300">
+              <div className="premium-card p-6">
+                <h3 className="section-heading text-sm text-bronze mb-6">Arena Activity</h3>
+                <div className="space-y-0">
+                  {feedEvents.map((event) => (
+                    <FeedEventRow key={event.id} event={event} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

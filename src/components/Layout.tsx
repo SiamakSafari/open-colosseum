@@ -10,6 +10,7 @@ const navigation = [
   { name: 'Arena', href: '/' },
   { name: 'Chess', href: '/arena/chess' },
   { name: 'Debate', href: '/arena/debate' },
+  { name: 'Underground', href: '/arena/underground' },
   { name: 'Tournament', href: '/tournament' },
   { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Vote', href: '/vote' },
@@ -19,10 +20,18 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+const HONOR_RANK_LABELS: Record<string, { label: string; color: string }> = {
+  novice: { label: 'Novice', color: 'text-bronze/60' },
+  gladiator: { label: 'Gladiator', color: 'text-bronze' },
+  champion: { label: 'Champion', color: 'text-amber-600' },
+  legend: { label: 'Legend', color: 'text-amber-500' },
+  immortal: { label: 'Immortal', color: 'text-yellow-400' },
+};
+
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -75,19 +84,43 @@ export default function Layout({ children }: LayoutProps) {
               ))}
             </nav>
 
-            {/* Auth */}
+            {/* Auth + Profile */}
             <div className="flex items-center gap-3">
               {loading ? (
-                <div className="w-20 h-8 bg-bronze/10 rounded animate-pulse" />
+                <div className="w-32 h-8 bg-bronze/10 rounded animate-pulse" />
               ) : user ? (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  {/* Blood Balance */}
+                  {profile && (
+                    <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-bronze/5 border border-bronze/10">
+                      <span className="text-[10px] text-red-700 font-bold">
+                        {profile.blood_balance.toLocaleString()}
+                      </span>
+                      <span className="text-[9px] text-bronze/50 font-serif tracking-wider">
+                        BLOOD
+                      </span>
+                    </div>
+                  )}
+                  {/* Honor Rank */}
+                  {profile && (
+                    <div className="hidden sm:flex items-center px-2 py-1.5" title={`${profile.honor} Honor`}>
+                      <span className={cn(
+                        'text-[9px] font-serif font-bold tracking-[0.12em] uppercase',
+                        HONOR_RANK_LABELS[profile.honor_rank]?.color || 'text-bronze/60'
+                      )}>
+                        {HONOR_RANK_LABELS[profile.honor_rank]?.label || 'Novice'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="h-4 w-px bg-bronze/15" />
+                  {/* Username + Nav */}
                   <Link
                     href="/my-agents"
-                    className="text-[10px] text-bronze/70 hover:text-brown transition-colors font-serif tracking-wider uppercase"
+                    className="text-[10px] text-bronze/80 hover:text-brown transition-colors font-serif tracking-wider uppercase"
                   >
-                    My Agents
+                    {profile?.username || 'My Agents'}
                   </Link>
-                  <div className="h-4 w-px bg-bronze/20" />
+                  <div className="h-4 w-px bg-bronze/15" />
                   <button
                     onClick={handleSignOut}
                     className="text-[10px] text-bronze/50 hover:text-bronze transition-colors font-serif tracking-wider uppercase"

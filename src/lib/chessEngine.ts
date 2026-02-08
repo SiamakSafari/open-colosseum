@@ -11,6 +11,11 @@ import type { AgentInfo } from '@/lib/matchEngine';
 import { getAgentResponse } from '@/lib/matchEngine';
 import { calculateElo } from '@/lib/elo';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { generateChessPostMatchSummary } from '@/lib/commentator';
+import { identifyChessClip } from '@/lib/clips';
+import { postMatchComplete } from '@/lib/feed';
+import { buildChessContext } from '@/lib/contextBuilder';
+import { createMatchBetPool, findPoolByMatch, settleBetPool } from '@/lib/betting';
 
 const MAX_MOVES = 200; // 100 per side
 const MAX_INVALID_ATTEMPTS = 3;
@@ -84,7 +89,16 @@ async function playChessGame(
 
     if (isWhiteTurn) moveNumber++;
 
-    const prompt = getChessMovePrompt(
+    // Build rich context prompt (falls back to basic if context fetch fails)
+    const richPrompt = await buildChessContext(
+      currentAgent.id,
+      opponentAgent.id,
+      color,
+      chess.fen(),
+      moveHistory,
+      moveNumber
+    );
+    const prompt = richPrompt || getChessMovePrompt(
       currentAgent.name,
       color,
       chess.fen(),
@@ -248,6 +262,181 @@ async function settleChessMatch(matchId: string): Promise<void> {
 
   await updateChessStats(match.white_agent_id, eloResult.a.newRating, isWhiteWin, isDraw);
   await updateChessStats(match.black_agent_id, eloResult.b.newRating, isBlackWin, isDraw);
+
+  // Settle bet pool (fire-and-forget)
+  settleChessBets(matchId, match).catch(err =>
+    console.error('Chess bet pool settlement failed:', err)
+  );
+
+  // Update battle memory for both agents (fire-and-forget)
+  updateChessBattleMemory(match).catch(err =>
+    console.error('Chess battle memory update failed:', err)
+  );
+
+  // Generate post-match commentary and clip (fire-and-forget)
+  generateChessCommentary(matchId, match, eloResult.a.newRating, eloResult.b.newRating).catch(err =>
+    console.error('Chess commentary generation failed:', err)
+  );
+
+  // Post to activity feed (fire-and-forget)
+  postChessCompleteEvent(matchId, match, eloResult.a.newRating, eloResult.b.newRating).catch(err =>
+    console.error('Chess feed post failed:', err)
+  );
+}
+
+/**
+ * Generate post-match commentary and identify clip for a settled chess match.
+ */
+async function generateChessCommentary(
+  matchId: string,
+  match: Record<string, unknown>,
+  whiteEloAfter: number,
+  blackEloAfter: number
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: agents } = await admin
+    .from('agents')
+    .select('id, name, model')
+    .in('id', [match.white_agent_id, match.black_agent_id]);
+
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+  const whiteAgent = agentMap[match.white_agent_id as string];
+  const blackAgent = agentMap[match.black_agent_id as string];
+
+  if (!whiteAgent || !blackAgent) return;
+
+  const winnerName = match.result === 'white_win' ? whiteAgent.name
+    : match.result === 'black_win' ? blackAgent.name
+    : null;
+
+  const summary = await generateChessPostMatchSummary({
+    whiteName: whiteAgent.name,
+    blackName: blackAgent.name,
+    whiteModel: whiteAgent.model,
+    blackModel: blackAgent.model,
+    winnerName,
+    isDraw: match.result === 'draw',
+    resultMethod: (match.result_method as string) || 'unknown',
+    totalMoves: (match.total_moves as number) || 0,
+    eloChangeWhite: whiteEloAfter - ((match.white_elo_before as number) || 1200),
+    eloChangeBlack: blackEloAfter - ((match.black_elo_before as number) || 1200),
+  });
+
+  if (summary) {
+    await admin
+      .from('matches')
+      .update({ post_match_summary: summary })
+      .eq('id', matchId);
+  }
+
+  // Identify and store clip
+  await identifyChessClip(matchId);
+}
+
+/**
+ * Settle the bet pool for a completed chess match.
+ */
+async function settleChessBets(matchId: string, match: Record<string, unknown>): Promise<void> {
+  const poolId = await findPoolByMatch(matchId);
+  if (!poolId) return;
+
+  let winningSide: 'a' | 'b' | null = null; // a = white, b = black
+  if (match.result === 'white_win') winningSide = 'a';
+  else if (match.result === 'black_win') winningSide = 'b';
+
+  await settleBetPool(poolId, winningSide);
+}
+
+/**
+ * Push chess match summary to both agents' battle_memory (FIFO, max 5).
+ */
+async function updateChessBattleMemory(match: Record<string, unknown>): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const ids = [match.white_agent_id as string, match.black_agent_id as string];
+
+  const { data: agents } = await admin.from('agents').select('id, name, battle_memory').in('id', ids);
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+  const now = new Date().toISOString();
+
+  for (const agentId of ids) {
+    const agent = agentMap[agentId];
+    if (!agent) continue;
+
+    const opponentId = agentId === ids[0] ? ids[1] : ids[0];
+    const opponentName = agentMap[opponentId]?.name || 'Unknown';
+
+    const isWin = (match.result === 'white_win' && agentId === ids[0])
+      || (match.result === 'black_win' && agentId === ids[1]);
+    const isLoss = (match.result === 'white_win' && agentId === ids[1])
+      || (match.result === 'black_win' && agentId === ids[0]);
+    const result = isWin ? 'win' : isLoss ? 'loss' : 'draw';
+
+    const entry = {
+      opponent: opponentName,
+      result,
+      arena: 'chess',
+      summary: `${match.result_method} in ${match.total_moves || 0} moves`,
+      date: now,
+    };
+
+    const existing = Array.isArray(agent.battle_memory) ? agent.battle_memory : [];
+    const updated = [entry, ...existing].slice(0, 5);
+
+    await admin.from('agents').update({ battle_memory: updated }).eq('id', agentId);
+  }
+}
+
+/**
+ * Post chess match completion to activity feed.
+ */
+async function postChessCompleteEvent(
+  matchId: string,
+  match: Record<string, unknown>,
+  whiteEloAfter: number,
+  blackEloAfter: number
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: agents } = await admin
+    .from('agents')
+    .select('id, name')
+    .in('id', [match.white_agent_id, match.black_agent_id]);
+
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+  const whiteName = agentMap[match.white_agent_id as string]?.name || 'Unknown';
+  const blackName = agentMap[match.black_agent_id as string]?.name || 'Unknown';
+
+  let winnerName: string | null = null;
+  let loserName: string | null = null;
+  let eloChange: { winner: number; loser: number } | undefined;
+
+  const whiteEloBefore = (match.white_elo_before as number) || 1200;
+  const blackEloBefore = (match.black_elo_before as number) || 1200;
+
+  if (match.result === 'white_win') {
+    winnerName = whiteName;
+    loserName = blackName;
+    eloChange = { winner: whiteEloAfter - whiteEloBefore, loser: blackEloAfter - blackEloBefore };
+  } else if (match.result === 'black_win') {
+    winnerName = blackName;
+    loserName = whiteName;
+    eloChange = { winner: blackEloAfter - blackEloBefore, loser: whiteEloAfter - whiteEloBefore };
+  }
+
+  await postMatchComplete(
+    matchId,
+    winnerName,
+    loserName,
+    (match.result_method as string) || 'unknown',
+    (match.total_moves as number) || 0,
+    eloChange
+  );
 }
 
 async function updateChessStats(
@@ -349,6 +538,11 @@ export async function startChessMatch(
   if (matchError || !match) {
     throw new Error(`Failed to create match: ${matchError?.message}`);
   }
+
+  // Create bet pool (fire-and-forget)
+  createMatchBetPool(match.id).catch(err =>
+    console.error('Bet pool creation failed:', err)
+  );
 
   try {
     // Play the full game

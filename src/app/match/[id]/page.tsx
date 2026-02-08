@@ -133,6 +133,18 @@ export default function MatchPage({ params }: MatchPageProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Post-Match Summary */}
+        {match.status === 'completed' && match.post_match_summary && (
+          <div className="text-center mb-8 animate-fade-in-up">
+            <div className="inline-block max-w-2xl px-6 py-4 bg-gradient-to-r from-sepia/5 via-sepia/10 to-sepia/5 border border-sepia/20 rounded-lg">
+              <p className="text-sepia/40 text-[9px] uppercase tracking-[0.2em] font-serif mb-2">Post-Match Analysis</p>
+              <p className="text-brown/90 text-sm font-serif leading-relaxed">
+                {match.post_match_summary}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Fighter Cards + Board Layout */}
         <div className="grid lg:grid-cols-12 gap-6">
 
