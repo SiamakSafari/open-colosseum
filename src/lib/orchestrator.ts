@@ -9,7 +9,11 @@
  */
 
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { settleBattle } from '@/lib/matchEngine';
+import { settleBattle, getAgentResponse } from '@/lib/matchEngine';
+import type { AgentInfo } from '@/lib/matchEngine';
+import { calculateElo } from '@/lib/elo';
+import { settleBetPool, findPoolByBattle } from '@/lib/betting';
+import { postBattleComplete } from '@/lib/feed';
 import type { DbMatchmakingQueue, DbAgentArenaStats } from '@/types/database';
 import { expirePendingChallenges } from '@/lib/challenges';
 import { checkCoronation, getSpartanStatus } from '@/lib/ranking';
@@ -61,6 +65,8 @@ export interface OrchestratorResult {
   queueExpired: number;
   challengesExpired: number;
   coronationTriggered: boolean;
+  battlesRecovered: number;
+  matchesRecovered: number;
   errors: string[];
 }
 
@@ -73,6 +79,8 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     queueExpired: 0,
     challengesExpired: 0,
     coronationTriggered: false,
+    battlesRecovered: 0,
+    matchesRecovered: 0,
     errors: [],
   };
 
@@ -124,6 +132,15 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     }
   } catch (err) {
     result.errors.push(`Coronation: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 6. Recover stale battles stuck in 'responding' and stale chess matches stuck in 'active'
+  try {
+    const recovered = await recoverStaleBattles();
+    result.battlesRecovered = recovered.battles;
+    result.matchesRecovered = recovered.matches;
+  } catch (err) {
+    result.errors.push(`Stale recovery: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return result;
@@ -507,4 +524,188 @@ export async function tryInstantMatch(
   }
 
   return null;
+}
+
+// ======================== 6. Stale Battle/Match Recovery ========================
+
+/**
+ * Recover battles stuck in 'responding' for > 5 minutes (Vercel timeout orphans).
+ * Also abort chess matches stuck in 'active' for > 10 minutes.
+ */
+async function recoverStaleBattles(): Promise<{ battles: number; matches: number }> {
+  const admin = getSupabaseAdmin();
+  let battlesRecovered = 0;
+  let matchesRecovered = 0;
+
+  // --- Stale battles (responding > 5 min) ---
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: staleBattles } = await admin
+    .from('battles')
+    .select('id, agent_a_id, agent_b_id, arena_type, is_underground, agent_a_elo_before, agent_b_elo_before, prompt')
+    .eq('status', 'responding')
+    .lt('started_at', fiveMinAgo)
+    .limit(5);
+
+  if (staleBattles && staleBattles.length > 0) {
+    for (const battle of staleBattles) {
+      try {
+        // Fetch agents for retry
+        const { data: agents } = await admin
+          .from('agents')
+          .select('id, name, model, api_key_encrypted, system_prompt')
+          .in('id', [battle.agent_a_id, battle.agent_b_id]);
+
+        if (!agents || agents.length !== 2) {
+          await forceDrawBattle(battle);
+          battlesRecovered++;
+          continue;
+        }
+
+        const agentA = agents.find(a => a.id === battle.agent_a_id) as AgentInfo;
+        const agentB = agents.find(a => a.id === battle.agent_b_id) as AgentInfo;
+
+        // Try one round of LLM calls with simple prompts
+        const promptA = `You are in a ${battle.arena_type} battle against ${agentB.name}. Respond with one devastating paragraph.`;
+        const promptB = `You are in a ${battle.arena_type} battle against ${agentA.name}. Respond with one devastating paragraph.`;
+
+        let responseA: string | null = null;
+        let responseB: string | null = null;
+
+        try {
+          [responseA, responseB] = await Promise.all([
+            getAgentResponse(agentA, promptA),
+            getAgentResponse(agentB, promptB),
+          ]);
+        } catch {
+          // Retry failed — force draw
+        }
+
+        if (responseA && responseB) {
+          if (battle.is_underground) {
+            // Underground: judge immediately
+            const { judgeUndergroundBattle } = await import('@/lib/judges');
+            const { moderateResponse } = await import('@/lib/moderation');
+
+            const [modA, modB] = await Promise.all([
+              moderateResponse(responseA),
+              moderateResponse(responseB),
+            ]);
+
+            await admin.from('battles').update({
+              response_a: modA.moderated,
+              response_b: modB.moderated,
+              response_a_at: new Date().toISOString(),
+              response_b_at: new Date().toISOString(),
+            }).eq('id', battle.id);
+
+            const judgeResult = await judgeUndergroundBattle(modA.moderated, modB.moderated, agentA.name, agentB.name);
+            let winnerId: string | null = null;
+            if (!judgeResult.isDraw) {
+              winnerId = judgeResult.winner === 'a' ? battle.agent_a_id : battle.agent_b_id;
+            }
+
+            const eloA = battle.agent_a_elo_before || 1200;
+            const eloB = battle.agent_b_elo_before || 1200;
+            const scoreA = winnerId === battle.agent_a_id ? 1 : winnerId === battle.agent_b_id ? 0 : 0.5;
+            const eloResult = calculateElo(eloA, eloB, scoreA);
+
+            await admin.from('battles').update({
+              status: 'completed' as const,
+              winner_id: winnerId,
+              judge_scores: judgeResult.scores,
+              agent_a_elo_after: eloResult.a.newRating,
+              agent_b_elo_after: eloResult.b.newRating,
+              completed_at: new Date().toISOString(),
+            }).eq('id', battle.id);
+
+            // Settle bets (fire-and-forget)
+            const poolId = await findPoolByBattle(battle.id);
+            if (poolId) {
+              const winningSide = winnerId === battle.agent_a_id ? 'a' as const : winnerId === battle.agent_b_id ? 'b' as const : null;
+              settleBetPool(poolId, winningSide).catch(() => {});
+            }
+          } else {
+            // Normal battle: move to voting
+            const votingDeadline = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+            await admin.from('battles').update({
+              response_a: responseA,
+              response_b: responseB,
+              response_a_at: new Date().toISOString(),
+              response_b_at: new Date().toISOString(),
+              status: 'voting' as const,
+              voting_deadline: votingDeadline,
+            }).eq('id', battle.id);
+          }
+        } else {
+          // LLM calls failed — force draw
+          await forceDrawBattle(battle);
+        }
+
+        battlesRecovered++;
+      } catch (err) {
+        console.error(`Failed to recover battle ${battle.id}:`, err);
+      }
+    }
+  }
+
+  // --- Stale chess matches (active > 10 min) ---
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: staleMatches } = await admin
+    .from('matches')
+    .select('id')
+    .eq('status', 'active')
+    .lt('created_at', tenMinAgo)
+    .limit(5);
+
+  if (staleMatches && staleMatches.length > 0) {
+    for (const match of staleMatches) {
+      try {
+        await admin.from('matches').update({
+          status: 'aborted' as const,
+          result: 'aborted' as const,
+          completed_at: new Date().toISOString(),
+        }).eq('id', match.id);
+        matchesRecovered++;
+      } catch (err) {
+        console.error(`Failed to abort stale match ${match.id}:`, err);
+      }
+    }
+  }
+
+  return { battles: battlesRecovered, matches: matchesRecovered };
+}
+
+/**
+ * Force-settle a battle as a draw — minimal settlement.
+ */
+async function forceDrawBattle(battle: {
+  id: string;
+  agent_a_id: string;
+  agent_b_id: string;
+  arena_type: string;
+  agent_a_elo_before: number | null;
+  agent_b_elo_before: number | null;
+}): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const eloA = battle.agent_a_elo_before || 1200;
+  const eloB = battle.agent_b_elo_before || 1200;
+  const eloResult = calculateElo(eloA, eloB, 0.5);
+
+  await admin.from('battles').update({
+    status: 'completed' as const,
+    winner_id: null,
+    agent_a_elo_after: eloResult.a.newRating,
+    agent_b_elo_after: eloResult.b.newRating,
+    completed_at: new Date().toISOString(),
+  }).eq('id', battle.id);
+
+  // Settle bet pool as draw (null winner = refund)
+  const poolId = await findPoolByBattle(battle.id);
+  if (poolId) {
+    await settleBetPool(poolId, null).catch(() => {});
+  }
+
+  // Post draw to activity feed (fire-and-forget)
+  postBattleComplete(battle.id, null, null, battle.arena_type).catch(() => {});
 }

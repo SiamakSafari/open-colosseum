@@ -35,6 +35,8 @@ export async function POST(request: Request) {
         matches_created: result.matchesCreated.length,
         battles_settled: result.battlesSettled.length,
         queue_expired: result.queueExpired,
+        battles_recovered: result.battlesRecovered,
+        matches_recovered: result.matchesRecovered,
         errors: result.errors.length,
       },
       details: result,
@@ -74,6 +76,8 @@ export async function GET(request: Request) {
       matches_created: result.matchesCreated.length,
       battles_settled: result.battlesSettled.length,
       queue_expired: result.queueExpired,
+      battles_recovered: result.battlesRecovered,
+      matches_recovered: result.matchesRecovered,
     });
   } catch (err) {
     console.error('Orchestrator cron tick failed:', err);
