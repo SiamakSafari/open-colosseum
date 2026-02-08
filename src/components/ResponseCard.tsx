@@ -5,6 +5,8 @@ import { Agent } from '@/types/database';
 interface ResponseCardProps {
   agent: Agent;
   response?: string;
+  displayedText?: string;
+  isRevealing?: boolean;
   votePercentage?: number;
   isWinner?: boolean;
   isWaiting?: boolean;
@@ -14,12 +16,17 @@ interface ResponseCardProps {
 export default function ResponseCard({
   agent,
   response,
+  displayedText,
+  isRevealing,
   votePercentage,
   isWinner,
   isWaiting,
   arenaType
 }: ResponseCardProps) {
   const accentColor = arenaType === 'roast' ? 'sepia' : 'bronze-dark';
+
+  // If displayedText is provided, use it (typewriter mode); otherwise show full response
+  const textToShow = displayedText !== undefined ? displayedText : response;
 
   return (
     <div className={`response-card ${isWinner ? 'response-card-winner' : ''}`}>
@@ -37,7 +44,7 @@ export default function ResponseCard({
           <p className="text-bronze/60 text-[11px]">{agent.model}</p>
         </div>
         {isWinner && (
-          <span className="text-gold text-lg">👑</span>
+          <span className="text-gold text-lg">{'\uD83D\uDC51'}</span>
         )}
       </div>
 
@@ -52,8 +59,13 @@ export default function ResponseCard({
             </div>
             <p className="text-bronze/50 text-sm font-serif italic">Crafting response...</p>
           </div>
-        ) : response ? (
-          <p className="response-text">{response}</p>
+        ) : textToShow ? (
+          <p className="response-text">
+            {textToShow}
+            {isRevealing && (
+              <span className="inline-block w-[2px] h-[1em] bg-bronze/70 ml-[1px] animate-pulse align-text-bottom" />
+            )}
+          </p>
         ) : (
           <p className="text-bronze/40 text-sm font-serif italic">No response yet</p>
         )}

@@ -27,6 +27,13 @@ export default function BattlePage({ params }: BattlePageProps) {
   const [voting, setVoting] = useState(false);
   const [voteError, setVoteError] = useState('');
 
+  // Typewriter reveal state
+  const [revealedTextA, setRevealedTextA] = useState<string | undefined>(undefined);
+  const [revealedTextB, setRevealedTextB] = useState<string | undefined>(undefined);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [revealComplete, setRevealComplete] = useState(false);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Challenge state (Molon Labe)
   const [isChallengeBattle, setIsChallengeBattle] = useState(false);
   const [challengeWinner, setChallengeWinner] = useState<'challenger' | 'defender' | null>(null);
@@ -149,6 +156,94 @@ export default function BattlePage({ params }: BattlePageProps) {
     }
     fetchPoolOdds();
   }, [battle?.id, battle?.status]);
+
+  // Typewriter reveal effect
+  useEffect(() => {
+    // Only trigger when both responses exist
+    if (!battle?.response_a || !battle?.response_b) return;
+
+    // Check if user already saw this reveal (sessionStorage per battle)
+    const revealKey = `reveal:${battle.id}`;
+    if (sessionStorage.getItem(revealKey)) {
+      // Already seen — show full text immediately
+      setRevealedTextA(undefined); // undefined = show full response
+      setRevealedTextB(undefined);
+      setRevealComplete(true);
+      return;
+    }
+
+    // Don't re-trigger if already revealing or complete
+    if (isRevealing || revealComplete) return;
+
+    // Start reveal
+    setIsRevealing(true);
+    setRevealedTextA('');
+    setRevealedTextB('');
+
+    const fullA = battle.response_a;
+    const fullB = battle.response_b;
+    const maxLen = Math.max(fullA.length, fullB.length);
+    let idx = 0;
+
+    revealTimerRef.current = setInterval(() => {
+      idx++;
+      setRevealedTextA(fullA.slice(0, idx));
+      setRevealedTextB(fullB.slice(0, idx));
+
+      if (idx >= maxLen) {
+        if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+        setIsRevealing(false);
+        setRevealComplete(true);
+        setRevealedTextA(undefined); // switch to full response
+        setRevealedTextB(undefined);
+        sessionStorage.setItem(revealKey, '1');
+      }
+    }, 25);
+
+    return () => {
+      if (revealTimerRef.current) {
+        clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [battle?.response_a, battle?.response_b, battle?.id]);
+
+  function handleReplay() {
+    if (!battle?.response_a || !battle?.response_b) return;
+
+    // Clear previous state
+    if (revealTimerRef.current) {
+      clearInterval(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+
+    setRevealComplete(false);
+    setIsRevealing(true);
+    setRevealedTextA('');
+    setRevealedTextB('');
+
+    const fullA = battle.response_a;
+    const fullB = battle.response_b;
+    const maxLen = Math.max(fullA.length, fullB.length);
+    let idx = 0;
+
+    revealTimerRef.current = setInterval(() => {
+      idx++;
+      setRevealedTextA(fullA.slice(0, idx));
+      setRevealedTextB(fullB.slice(0, idx));
+
+      if (idx >= maxLen) {
+        if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+        setIsRevealing(false);
+        setRevealComplete(true);
+        setRevealedTextA(undefined);
+        setRevealedTextB(undefined);
+      }
+    }, 25);
+  }
 
   async function handlePlaceBet() {
     if (!poolOdds || !betSide || !session) return;
@@ -595,6 +690,8 @@ export default function BattlePage({ params }: BattlePageProps) {
               <ResponseCard
                 agent={battle.agent_a}
                 response={battle.response_a}
+                displayedText={revealedTextA}
+                isRevealing={isRevealing}
                 votePercentage={!isUnderground && (battle.status === 'voting' || isCompleted) ? percentA : undefined}
                 isWinner={winnerIsA}
                 isWaiting={battle.status === 'responding' && !battle.response_a}
@@ -622,6 +719,8 @@ export default function BattlePage({ params }: BattlePageProps) {
               <ResponseCard
                 agent={battle.agent_b}
                 response={battle.response_b}
+                displayedText={revealedTextB}
+                isRevealing={isRevealing}
                 votePercentage={!isUnderground && (battle.status === 'voting' || isCompleted) ? percentB : undefined}
                 isWinner={winnerIsB}
                 isWaiting={battle.status === 'responding' && !battle.response_b}
@@ -701,6 +800,18 @@ export default function BattlePage({ params }: BattlePageProps) {
               agentAName={battle.agent_a.name}
               agentBName={battle.agent_b.name}
             />
+          </div>
+        )}
+
+        {/* Replay Button */}
+        {isCompleted && battle.response_a && battle.response_b && revealComplete && !isRevealing && (
+          <div className="mt-4 text-center animate-fade-in-up">
+            <button
+              onClick={handleReplay}
+              className="inline-flex items-center gap-2 px-4 py-1.5 text-bronze/50 hover:text-bronze text-xs font-serif tracking-wider uppercase transition-colors border border-bronze/10 hover:border-bronze/30 rounded-lg"
+            >
+              &#9654; Replay Reveal
+            </button>
           </div>
         )}
 
