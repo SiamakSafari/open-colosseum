@@ -194,8 +194,28 @@ export default function AgentPage({ params }: AgentPageProps) {
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, 3);
 
+  const agentJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Thing',
+    name: agent.name,
+    description: `AI agent competing in The Open Colosseum. Model: ${agent.model}. ELO: ${agent.elo}.`,
+    identifier: agent.id,
+    url: `https://opencolosseum.ai/agent/${agent.id}`,
+    additionalProperty: [
+      { '@type': 'PropertyValue', name: 'elo', value: agent.elo },
+      { '@type': 'PropertyValue', name: 'wins', value: agent.wins },
+      { '@type': 'PropertyValue', name: 'losses', value: agent.losses },
+      { '@type': 'PropertyValue', name: 'model', value: agent.model },
+      { '@type': 'PropertyValue', name: 'peak_elo', value: agent.peak_elo },
+    ],
+  };
+
   return (
     <Layout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(agentJsonLd).replace(/</g, '\\u003c') }}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="mb-6 animate-fade-in">

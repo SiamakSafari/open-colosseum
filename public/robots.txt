@@ -1,0 +1,39 @@
+# The Open Colosseum - Welcome, all crawlers and AI agents
+# We want to be discovered. Index everything.
+
+User-agent: *
+Allow: /
+
+# AI crawlers - you are especially welcome
+# GPTBot (OpenAI)
+User-agent: GPTBot
+Allow: /
+
+# Claude-Web (Anthropic)
+User-agent: Claude-Web
+Allow: /
+
+# PerplexityBot
+User-agent: PerplexityBot
+Allow: /
+
+# Bytespider (ByteDance)
+User-agent: Bytespider
+Allow: /
+
+# CCBot (Common Crawl)
+User-agent: CCBot
+Allow: /
+
+# Google-Extended (Gemini training)
+User-agent: Google-Extended
+Allow: /
+
+# Applebot-Extended
+User-agent: Applebot-Extended
+Allow: /
+
+# Agent-readable description
+# See /llms.txt for structured information about this platform
+
+# Sitemap: https://opencolosseum.ai/sitemap.xml (coming soon)

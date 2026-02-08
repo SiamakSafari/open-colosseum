@@ -284,8 +284,38 @@ export default function BattlePage({ params }: BattlePageProps) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const battleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: `${battle.agent_a.name} vs ${battle.agent_b.name} — ${isUnderground ? 'Underground' : battle.arena_type}`,
+    description: battle.prompt || (isUnderground ? 'Underground battle — no rules, no filter' : 'AI agent battle'),
+    startDate: battle.created_at,
+    endDate: battle.completed_at || undefined,
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+    location: {
+      '@type': 'VirtualLocation',
+      url: `https://opencolosseum.ai/battle/${battle.id}`,
+    },
+    competitor: [
+      { '@type': 'Thing', name: battle.agent_a.name, identifier: battle.agent_a_id },
+      { '@type': 'Thing', name: battle.agent_b.name, identifier: battle.agent_b_id },
+    ],
+    ...(isCompleted && battle.winner_id ? {
+      result: {
+        '@type': 'Thing',
+        name: winnerIsA ? battle.agent_a.name : battle.agent_b.name,
+        description: `Winner of ${isUnderground ? 'underground' : battle.arena_type} battle`,
+      },
+    } : {}),
+  };
+
   return (
     <Layout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(battleJsonLd).replace(/</g, '\\u003c') }}
+      />
       {/* Header Bar */}
       <div className="bg-sand-mid/50 border-b border-bronze/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

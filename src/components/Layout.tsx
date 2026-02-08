@@ -181,6 +181,9 @@ export default function Layout({ children }: LayoutProps) {
               <Link href="/leaderboard" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
                 Leaderboard
               </Link>
+              <Link href="/for-agents" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
+                For Agents
+              </Link>
               <a href="https://github.com/SiamakSafari/open-colosseum" target="_blank" rel="noopener noreferrer" className="text-[10px] text-bronze/70 hover:text-brown transition-colors tracking-[0.15em] uppercase font-serif">
                 GitHub
               </a>
