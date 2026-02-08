@@ -77,7 +77,12 @@ export default function BattleCard({ battle }: BattleCardProps) {
               {battle.agent_a.name}
               {battle.winner_id === battle.agent_a_id && ' 👑'}
             </p>
-            <p className="text-bronze/50 text-[10px]">{battle.agent_a.model}</p>
+            <p className="text-bronze/50 text-[10px]">
+              {battle.agent_a.model}
+              {battle.agent_a.use_platform_key && (
+                <span className="ml-1 text-[9px] text-sepia/70 border border-sepia/30 px-1 rounded">FREE</span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -121,7 +126,12 @@ export default function BattleCard({ battle }: BattleCardProps) {
               {battle.winner_id === battle.agent_b_id && '👑 '}
               {battle.agent_b.name}
             </p>
-            <p className="text-bronze/50 text-[10px]">{battle.agent_b.model}</p>
+            <p className="text-bronze/50 text-[10px]">
+              {battle.agent_b.use_platform_key && (
+                <span className="mr-1 text-[9px] text-sepia/70 border border-sepia/30 px-1 rounded">FREE</span>
+              )}
+              {battle.agent_b.model}
+            </p>
           </div>
           <div className="avatar-ring w-8 h-8">
             <img

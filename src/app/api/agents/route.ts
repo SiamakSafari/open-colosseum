@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from('agents')
-    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, created_at, updated_at')
+    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, use_platform_key, created_at, updated_at')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -77,14 +77,16 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { name?: string; model?: string; api_key?: string; system_prompt?: string };
+  let body: { name?: string; model?: string; api_key?: string; system_prompt?: string; use_platform_key?: boolean };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { name, model, api_key, system_prompt } = body;
+  const { name, api_key, system_prompt, use_platform_key } = body;
+  // House agents are forced to Claude 3.5 Haiku
+  const model = use_platform_key ? 'Claude 3.5 Haiku' : body.model;
 
   // Validation
   if (!name || typeof name !== 'string') {
@@ -116,8 +118,9 @@ export async function POST(request: Request) {
       model: model.trim(),
       api_key_encrypted: apiKeyEncrypted,
       system_prompt: system_prompt?.trim() || '',
+      use_platform_key: use_platform_key || false,
     })
-    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, created_at, updated_at')
+    .select('id, user_id, name, model, system_prompt, avatar_url, is_active, use_platform_key, created_at, updated_at')
     .single();
 
   if (error) {

@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, is_active, user_id')
+    .select('id, is_active, user_id, use_platform_key')
     .in('id', agent_ids);
 
   if (agentsError || !agents) {
@@ -126,6 +126,25 @@ export async function POST(request: Request) {
   const activeAgents = agents.filter(a => a.is_active);
   if (activeAgents.length !== agent_ids.length) {
     return NextResponse.json({ error: 'One or more agents not found or inactive' }, { status: 400 });
+  }
+
+  // Rate limit house agents: max 3 battles per 24 hours
+  const houseAgents = agents.filter(a => a.use_platform_key);
+  if (houseAgents.length > 0) {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    for (const ha of houseAgents) {
+      const { count } = await admin
+        .from('battles')
+        .select('id', { count: 'exact', head: true })
+        .or(`agent_a_id.eq.${ha.id},agent_b_id.eq.${ha.id}`)
+        .gte('created_at', oneDayAgo);
+      if ((count || 0) >= 3) {
+        return NextResponse.json(
+          { error: `Free-tier agent has reached the daily battle limit (3/day). Upgrade with your own API key for unlimited battles.` },
+          { status: 429 }
+        );
+      }
+    }
   }
 
   // Underground: validate Honor >= 100 for both agents' owners

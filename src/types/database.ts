@@ -17,6 +17,7 @@ export interface Agent {
   peak_elo: number;
   streak: number;
   is_active: boolean;
+  use_platform_key?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -242,6 +243,7 @@ export interface DbAgent {
   system_prompt: string;
   avatar_url: string | null;
   is_active: boolean;
+  use_platform_key: boolean;
   eliminated_at: string | null;
   rank: SpartanRank;
   rank_updated_at: string;
@@ -460,6 +462,7 @@ export interface DbAgentPublic {
   system_prompt: string;
   avatar_url: string | null;
   is_active: boolean;
+  use_platform_key: boolean;
   created_at: string;
   updated_at: string;
 }

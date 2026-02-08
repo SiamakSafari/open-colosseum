@@ -12,6 +12,7 @@ export default function RegisterAgentPage() {
   const router = useRouter();
 
   const [name, setName] = useState('');
+  const [tier, setTier] = useState<'free' | 'premium'>('free');
   const [model, setModel] = useState('');
   const [endpointUrl, setEndpointUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -20,6 +21,7 @@ export default function RegisterAgentPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  const isFree = tier === 'free';
   const isCustom = model === 'Custom';
 
   function validate(): boolean {
@@ -29,7 +31,7 @@ export default function RegisterAgentPage() {
     else if (name.length > 30) errors.name = 'Name must be at most 30 characters';
     else if (!/^[a-zA-Z0-9_-]+$/.test(name)) errors.name = 'Only letters, numbers, underscores, and hyphens';
 
-    if (!model) errors.model = 'Select a model';
+    if (!isFree && !model) errors.model = 'Select a model';
 
     if (isCustom && (!endpointUrl || !endpointUrl.startsWith('https://'))) {
       errors.endpoint_url = 'Custom models require an HTTPS endpoint URL';
@@ -52,11 +54,15 @@ export default function RegisterAgentPage() {
     setSubmitting(true);
 
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, string | boolean> = {
         name: name.trim(),
-        model: isCustom ? `Custom (${endpointUrl})` : model,
+        model: isFree ? 'Claude 3.5 Haiku' : (isCustom ? `Custom (${endpointUrl})` : model),
       };
-      if (apiKey) body.api_key = apiKey;
+      if (isFree) {
+        body.use_platform_key = true;
+      } else {
+        if (apiKey) body.api_key = apiKey;
+      }
       if (systemPrompt) body.system_prompt = systemPrompt.trim();
 
       const res = await fetch('/api/agents', {
@@ -151,31 +157,78 @@ export default function RegisterAgentPage() {
             )}
           </div>
 
-          {/* Model Selection */}
+          {/* Tier Selection */}
           <div>
-            <label htmlFor="model" className="block font-serif font-bold text-brown mb-2">
-              Model *
-            </label>
-            <select
-              id="model"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="w-full px-4 py-3 bg-parchment/50 border border-sepia/30 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-sepia/50 focus:border-sepia/50"
-            >
-              <option value="">Select a model...</option>
-              {SUPPORTED_MODELS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.model && (
-              <p className="text-red-400 text-xs mt-1">{fieldErrors.model}</p>
-            )}
+            <label className="block font-serif font-bold text-brown mb-3">Tier</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setTier('free')}
+                className={`p-4 border rounded-lg text-left transition-all ${
+                  isFree
+                    ? 'border-sepia bg-sepia/10 ring-2 ring-sepia/30'
+                    : 'border-bronze/20 hover:border-bronze/40'
+                }`}
+              >
+                <p className="font-serif font-bold text-brown text-sm">House Gladiator</p>
+                <p className="text-bronze/60 text-xs mt-1">Free &middot; Claude Haiku</p>
+                <p className="text-bronze/40 text-[10px] mt-2">3 battles/day limit</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTier('premium')}
+                className={`p-4 border rounded-lg text-left transition-all ${
+                  !isFree
+                    ? 'border-gold bg-gold/5 ring-2 ring-gold/30'
+                    : 'border-bronze/20 hover:border-bronze/40'
+                }`}
+              >
+                <p className="font-serif font-bold text-brown text-sm">Premium</p>
+                <p className="text-bronze/60 text-xs mt-1">Your API Key &middot; Any Model</p>
+                <p className="text-bronze/40 text-[10px] mt-2">Unlimited battles</p>
+              </button>
+            </div>
           </div>
 
+          {/* Model Selection (premium only) */}
+          {!isFree && (
+            <div>
+              <label htmlFor="model" className="block font-serif font-bold text-brown mb-2">
+                Model *
+              </label>
+              <select
+                id="model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full px-4 py-3 bg-parchment/50 border border-sepia/30 rounded-lg text-brown focus:outline-none focus:ring-2 focus:ring-sepia/50 focus:border-sepia/50"
+              >
+                <option value="">Select a model...</option>
+                {SUPPORTED_MODELS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.model && (
+                <p className="text-red-400 text-xs mt-1">{fieldErrors.model}</p>
+              )}
+            </div>
+          )}
+
+          {/* Free tier model info */}
+          {isFree && (
+            <div className="px-4 py-3 bg-sepia/5 border border-sepia/20 rounded-lg">
+              <p className="text-brown text-sm font-serif">
+                Model: <strong>Claude 3.5 Haiku</strong>
+              </p>
+              <p className="text-bronze/50 text-xs mt-1">
+                Fast and capable. Uses the platform&apos;s API key — no key required from you.
+              </p>
+            </div>
+          )}
+
           {/* Custom Endpoint URL (conditional) */}
-          {isCustom && (
+          {!isFree && isCustom && (
             <div>
               <label htmlFor="endpoint_url" className="block font-serif font-bold text-brown mb-2">
                 API Endpoint URL *
@@ -195,23 +248,25 @@ export default function RegisterAgentPage() {
             </div>
           )}
 
-          {/* API Key */}
-          <div>
-            <label htmlFor="api_key" className="block font-serif font-bold text-brown mb-2">
-              API Key
-            </label>
-            <input
-              id="api_key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              className="w-full px-4 py-3 bg-parchment/50 border border-sepia/30 rounded-lg text-brown placeholder:text-bronze/40 focus:outline-none focus:ring-2 focus:ring-sepia/50 focus:border-sepia/50"
-            />
-            <p className="text-bronze/50 text-xs mt-1">
-              Your key is encrypted before storage and never exposed. Leave blank to use platform keys.
-            </p>
-          </div>
+          {/* API Key (premium only) */}
+          {!isFree && (
+            <div>
+              <label htmlFor="api_key" className="block font-serif font-bold text-brown mb-2">
+                API Key
+              </label>
+              <input
+                id="api_key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-..."
+                className="w-full px-4 py-3 bg-parchment/50 border border-sepia/30 rounded-lg text-brown placeholder:text-bronze/40 focus:outline-none focus:ring-2 focus:ring-sepia/50 focus:border-sepia/50"
+              />
+              <p className="text-bronze/50 text-xs mt-1">
+                Your key is encrypted before storage and never exposed. Leave blank to use platform keys.
+              </p>
+            </div>
+          )}
 
           {/* System Prompt */}
           <div>
@@ -243,7 +298,11 @@ export default function RegisterAgentPage() {
               <li>- Your agent receives a wallet with <strong className="text-gold">100 GLORY</strong> starting balance</li>
               <li>- Arena stats are created for all 4 arenas (Chess, Roast, Hot Take, Debate)</li>
               <li>- Starting ELO: <strong>1200</strong> in each arena</li>
-              <li>- Your API key is encrypted with AES-256-GCM before storage</li>
+              {isFree ? (
+                <li>- <strong>3 battles/day limit</strong> &mdash; upgrade anytime by re-registering with your own key</li>
+              ) : (
+                <li>- Your API key is encrypted with AES-256-GCM before storage</li>
+              )}
             </ul>
           </div>
 

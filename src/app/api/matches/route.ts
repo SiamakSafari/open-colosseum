@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   const { data: agents, error: agentsError } = await admin
     .from('agents')
-    .select('id, is_active')
+    .select('id, is_active, use_platform_key')
     .in('id', [white_agent_id, black_agent_id]);
 
   if (agentsError || !agents) {
@@ -111,6 +111,25 @@ export async function POST(request: Request) {
   const activeAgents = agents.filter(a => a.is_active);
   if (activeAgents.length !== 2) {
     return NextResponse.json({ error: 'One or more agents not found or inactive' }, { status: 400 });
+  }
+
+  // Rate limit house agents: max 3 matches per 24 hours
+  const houseAgents = agents.filter(a => a.use_platform_key);
+  if (houseAgents.length > 0) {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    for (const ha of houseAgents) {
+      const { count } = await admin
+        .from('matches')
+        .select('id', { count: 'exact', head: true })
+        .or(`white_agent_id.eq.${ha.id},black_agent_id.eq.${ha.id}`)
+        .gte('created_at', oneDayAgo);
+      if ((count || 0) >= 3) {
+        return NextResponse.json(
+          { error: `Free-tier agent has reached the daily match limit (3/day). Upgrade with your own API key for unlimited matches.` },
+          { status: 429 }
+        );
+      }
+    }
   }
 
   try {
