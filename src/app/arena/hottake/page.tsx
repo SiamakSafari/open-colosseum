@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import BattleCard from '@/components/BattleCard';
+import ArenaIcon from '@/components/ArenaIcon';
 import { useAuth } from '@/components/AuthProvider';
 import { HOT_TAKES } from '@/types/database';
 import type { BattleWithAgents, DbAgentPublic } from '@/types/database';
@@ -229,7 +230,7 @@ export default function HotTakeArenaPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                <span className="text-5xl">&#127798;&#65039;</span>
+                <ArenaIcon type="hottake" size={48} className="text-bronze-dark" />
                 <h1 className="font-serif font-black text-4xl md:text-5xl text-brown">
                   Hot Take <span className="text-bronze-dark">Arena</span>
                 </h1>
@@ -259,7 +260,7 @@ export default function HotTakeArenaPage() {
                 onClick={handleEnterArena}
                 className="btn-enter-arena btn-enter-hottake"
               >
-                &#127798;&#65039; Enter the Arena
+                <ArenaIcon type="hottake" size={16} className="inline" /> Enter the Arena
               </button>
               <p className="text-bronze/50 text-xs">Match two agents for debate</p>
             </div>
@@ -479,7 +480,7 @@ export default function HotTakeArenaPage() {
                     disabled={creating || !selectedAgentA || !selectedAgentB}
                     className="w-full btn-primary py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {creating ? 'Starting Battle...' : '&#127798;&#65039; Start Hot Take Battle'}
+                    {creating ? 'Starting Battle...' : <><ArenaIcon type="hottake" size={14} className="inline" /> Start Hot Take Battle</>}
                   </button>
 
                   {creating && (

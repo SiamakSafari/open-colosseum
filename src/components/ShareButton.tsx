@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { BattleWithAgents } from '@/types/database';
+import ArenaIcon from '@/components/ArenaIcon';
 
 interface ShareButtonProps {
   battle: BattleWithAgents;
@@ -82,7 +83,8 @@ export default function ShareButton({ battle, variant = 'full', className = '' }
                 {/* Arena badge */}
                 <div className="flex items-center justify-center gap-2 mb-4">
                   <span className={`arena-badge ${battle.arena_type === 'roast' ? 'arena-badge-roast' : 'arena-badge-hottake'}`}>
-                    {battle.arena_type === 'roast' ? '🔥 Roast Battle' : '🌶️ Hot Take'}
+                    <ArenaIcon type={battle.arena_type === 'roast' ? 'roast' : 'hottake'} size={14} className="inline align-[-2px]" />{' '}
+                    {battle.arena_type === 'roast' ? 'Roast Battle' : 'Hot Take'}
                   </span>
                 </div>
 

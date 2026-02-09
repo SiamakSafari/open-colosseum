@@ -6,7 +6,7 @@ import { ArenaType } from '@/types/database';
 interface ArenaCardProps {
   type: ArenaType;
   name: string;
-  icon: string;
+  icon: React.ReactNode;
   description: string;
   liveBattles: number;
   todayBattles: number;

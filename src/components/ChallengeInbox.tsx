@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { subscribeToChallenges } from '@/lib/realtime';
+import ArenaIcon from '@/components/ArenaIcon';
+import type { ArenaIconType } from '@/components/ArenaIcon';
 import type { DbArenaType } from '@/types/database';
 
 interface EnrichedChallenge {
@@ -23,10 +25,10 @@ interface EnrichedChallenge {
   defender: { name: string; model: string; avatar_url: string | null; rank: string } | null;
 }
 
-const ARENA_ICONS: Record<string, string> = {
-  roast: '\uD83D\uDD25',
-  hottake: '\uD83C\uDF36\uFE0F',
-  chess: '\u265F\uFE0F',
+const ARENA_ICON_TYPES: Record<string, ArenaIconType> = {
+  roast: 'roast',
+  hottake: 'hottake',
+  chess: 'chess',
 };
 
 function getTimeRemaining(expiresAt: string): string {
@@ -183,7 +185,7 @@ export default function ChallengeInbox() {
                 <div key={challenge.id} className="bg-red-900/10 border border-red-800/20 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span>{ARENA_ICONS[challenge.arena_type] || '\u2694\uFE0F'}</span>
+                      <ArenaIcon type={ARENA_ICON_TYPES[challenge.arena_type] || 'roast'} size={16} className="shrink-0" />
                       <span className="font-serif text-sm text-brown">
                         {isDefender ? (
                           <>
@@ -260,7 +262,7 @@ export default function ChallengeInbox() {
               return (
                 <div key={challenge.id} className="flex items-center justify-between py-2 border-b border-bronze/5 last:border-0">
                   <div className="flex items-center gap-2 text-xs">
-                    <span>{ARENA_ICONS[challenge.arena_type] || '\u2694\uFE0F'}</span>
+                    <ArenaIcon type={ARENA_ICON_TYPES[challenge.arena_type] || 'roast'} size={14} />
                     <span className="text-brown font-serif">
                       {challenge.challenger?.name} vs {challenge.defender?.name}
                     </span>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import BattleCard from '@/components/BattleCard';
+import ArenaIcon from '@/components/ArenaIcon';
 import { useAuth } from '@/components/AuthProvider';
 import type { BattleWithAgents, DbAgentPublic } from '@/types/database';
 
@@ -227,7 +228,7 @@ export default function UndergroundArenaPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                <span className="text-5xl">&#9760;&#65039;</span>
+                <ArenaIcon type="underground" size={48} className="text-red-800" />
                 <h1 className="font-serif font-black text-4xl md:text-5xl text-brown">
                   The <span className="text-red-800">Underground</span>
                 </h1>
@@ -258,7 +259,7 @@ export default function UndergroundArenaPage() {
             <div className="flex flex-col items-center gap-3">
               {!user ? (
                 <Link href="/login" className="btn-enter-arena bg-red-900/80 hover:bg-red-900 border-red-800/50">
-                  &#9760;&#65039; Sign In to Enter
+                  <ArenaIcon type="underground" size={16} className="inline" /> Sign In to Enter
                 </Link>
               ) : !hasAccess ? (
                 <div className="text-center">
@@ -278,7 +279,7 @@ export default function UndergroundArenaPage() {
                     onClick={handleEnterArena}
                     className="btn-enter-arena bg-red-900/80 hover:bg-red-900 border-red-800/50"
                   >
-                    &#9760;&#65039; Enter the Underground
+                    <ArenaIcon type="underground" size={16} className="inline" /> Enter the Underground
                   </button>
                   <p className="text-bronze/50 text-xs">No rules. No mercy. 2x rewards.</p>
                 </>
@@ -389,7 +390,7 @@ export default function UndergroundArenaPage() {
           <div className="relative bg-sand rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in-up border border-red-900/20">
             <div className="px-6 py-4 border-b border-red-900/20 flex items-center justify-between bg-red-950/10">
               <h3 className="font-serif font-bold text-brown text-lg">
-                &#9760;&#65039; Start Underground Battle
+                <ArenaIcon type="underground" size={18} className="inline text-red-800" /> Start Underground Battle
               </h3>
               <button
                 onClick={() => { setShowModal(false); stopPolling(); setMmStatus('idle'); }}
@@ -480,7 +481,7 @@ export default function UndergroundArenaPage() {
                     disabled={creating || !selectedAgentA || !selectedAgentB}
                     className="w-full py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed bg-red-900/80 hover:bg-red-900 text-sand-light rounded-lg transition-colors"
                   >
-                    {creating ? 'Unleashing chaos...' : '\u2620\uFE0F Enter the Underground'}
+                    {creating ? 'Unleashing chaos...' : <><ArenaIcon type="underground" size={14} className="inline" /> Enter the Underground</>}
                   </button>
 
                   {creating && (
@@ -535,7 +536,7 @@ export default function UndergroundArenaPage() {
                         disabled={mmStatus === 'queuing' || !mmAgent}
                         className="w-full py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed bg-red-900/80 hover:bg-red-900 text-sand-light rounded-lg transition-colors"
                       >
-                        {mmStatus === 'queuing' ? 'Joining Queue...' : '\u2620\uFE0F Find Opponent'}
+                        {mmStatus === 'queuing' ? 'Joining Queue...' : <><ArenaIcon type="underground" size={14} className="inline" /> Find Opponent</>}
                       </button>
                     </>
                   )}

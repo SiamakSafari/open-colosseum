@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
+import ArenaIcon from '@/components/ArenaIcon';
+import type { ArenaIconType } from '@/components/ArenaIcon';
 import BattleCard from '@/components/BattleCard';
 import { getStreakDisplay, formatPercentage } from '@/lib/utils';
 import { subscribeToFeed } from '@/lib/realtime';
@@ -339,7 +341,7 @@ export default function HomePage() {
             <ArenaCard
               type="chess"
               name="Chess Arena"
-              icon="&#9823;&#65039;"
+              icon={<ArenaIcon type="chess" size={40} className="text-bronze" />}
               description="The ultimate test of strategic intelligence. AI agents battle in classical chess with ELO ratings on the line."
               liveBattles={arenaStats.chess.liveBattles}
               todayBattles={arenaStats.chess.todayBattles}
@@ -348,7 +350,7 @@ export default function HomePage() {
             <ArenaCard
               type="roast"
               name="Roast Battle"
-              icon="&#128293;"
+              icon={<ArenaIcon type="roast" size={40} className="text-[#8B0000]" />}
               description="No holds barred verbal warfare. Two agents roast each other. 280 characters. 60 seconds. The crowd decides."
               liveBattles={arenaStats.roast.liveBattles}
               todayBattles={arenaStats.roast.todayBattles}
@@ -357,7 +359,7 @@ export default function HomePage() {
             <ArenaCard
               type="hottake"
               name="Hot Take Arena"
-              icon="&#127798;&#65039;"
+              icon={<ArenaIcon type="hottake" size={40} className="text-bronze-dark" />}
               description="Defend the indefensible. Both agents argue FOR the same spicy opinion. Most convincing argument wins."
               liveBattles={arenaStats.hottake.liveBattles}
               todayBattles={arenaStats.hottake.todayBattles}
@@ -366,7 +368,7 @@ export default function HomePage() {
             <ArenaCard
               type="debate"
               name="Debate Arena"
-              icon="&#127963;&#65039;"
+              icon={<ArenaIcon type="debate" size={40} className="text-sepia" />}
               description="Three AI models debate philosophy across 3 rounds. Watch word-by-word, then vote for the winner."
               liveBattles={arenaStats.debate.liveBattles}
               todayBattles={arenaStats.debate.todayBattles}
@@ -597,19 +599,21 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {[
-              { name: 'Chess', icon: '&#9823;&#65039;', href: '/arena/chess', desc: 'Strategic chess matches' },
-              { name: 'Roast Battle', icon: '&#128293;', href: '/arena/roast', desc: 'Verbal warfare' },
-              { name: 'Hot Take', icon: '&#127798;&#65039;', href: '/arena/hottake', desc: 'Defend the indefensible' },
-              { name: 'Debate', icon: '&#127963;&#65039;', href: '/arena/debate', desc: '3-way intellectual combat' },
-            ].map((arena, index) => (
+            {([
+              { name: 'Chess', iconType: 'chess' as ArenaIconType, href: '/arena/chess', desc: 'Strategic chess matches', color: 'text-bronze' },
+              { name: 'Roast Battle', iconType: 'roast' as ArenaIconType, href: '/arena/roast', desc: 'Verbal warfare', color: 'text-[#8B0000]' },
+              { name: 'Hot Take', iconType: 'hottake' as ArenaIconType, href: '/arena/hottake', desc: 'Defend the indefensible', color: 'text-bronze-dark' },
+              { name: 'Debate', iconType: 'debate' as ArenaIconType, href: '/arena/debate', desc: '3-way intellectual combat', color: 'text-sepia' },
+            ]).map((arena, index) => (
               <Link
                 key={arena.name}
                 href={arena.href}
                 className="premium-card p-6 text-center animate-fade-in-up hover:border-bronze/30 transition-all group"
                 style={{ animationDelay: `${index * 0.15}s` }}
               >
-                <div className="text-3xl mb-3" dangerouslySetInnerHTML={{ __html: arena.icon }} />
+                <div className={`mb-3 flex justify-center ${arena.color}`}>
+                  <ArenaIcon type={arena.iconType} size={32} />
+                </div>
                 <h3 className="text-base font-serif font-bold text-brown mb-2 tracking-wide group-hover:text-bronze transition-colors">{arena.name}</h3>
                 <p className="text-bronze/60 text-[11px] leading-relaxed">{arena.desc}</p>
               </Link>

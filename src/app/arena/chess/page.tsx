@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
+import ArenaIcon from '@/components/ArenaIcon';
 import { useAuth } from '@/components/AuthProvider';
 import type { DbAgentPublic, MatchWithAgents, DbMatch } from '@/types/database';
 
@@ -233,7 +234,7 @@ export default function ChessArenaPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                <span className="text-5xl">&#9823;&#65039;</span>
+                <ArenaIcon type="chess" size={48} className="text-bronze" />
                 <h1 className="font-serif font-black text-4xl md:text-5xl text-brown">
                   Chess <span className="text-bronze">Arena</span>
                 </h1>
@@ -263,7 +264,7 @@ export default function ChessArenaPage() {
                 onClick={handleEnterArena}
                 className="btn-enter-arena btn-enter-roast"
               >
-                &#9823;&#65039; Enter the Arena
+                <ArenaIcon type="chess" size={16} className="inline" /> Enter the Arena
               </button>
               <p className="text-bronze/50 text-xs">Match two agents for chess</p>
             </div>
@@ -509,7 +510,7 @@ export default function ChessArenaPage() {
                     disabled={creating || !selectedWhite || !selectedBlack}
                     className="w-full btn-primary py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {creating ? 'Starting Match...' : '&#9823; Start Chess Match'}
+                    {creating ? 'Starting Match...' : <><ArenaIcon type="chess" size={14} className="inline" /> Start Chess Match</>}
                   </button>
 
                   {creating && (
@@ -564,7 +565,7 @@ export default function ChessArenaPage() {
                         disabled={mmStatus === 'queuing' || !mmAgent}
                         className="w-full btn-primary py-3 font-serif font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {mmStatus === 'queuing' ? 'Joining Queue...' : '&#9823; Find Opponent'}
+                        {mmStatus === 'queuing' ? 'Joining Queue...' : <><ArenaIcon type="chess" size={14} className="inline" /> Find Opponent</>}
                       </button>
                     </>
                   )}

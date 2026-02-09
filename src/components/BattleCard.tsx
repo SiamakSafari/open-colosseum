@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { BattleWithAgents } from '@/types/database';
 import { getRelativeTime } from '@/lib/utils';
+import ArenaIcon from '@/components/ArenaIcon';
 
 interface BattleCardProps {
   battle: BattleWithAgents;
@@ -38,7 +39,8 @@ export default function BattleCard({ battle }: BattleCardProps) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className={`arena-badge ${isUnderground ? 'bg-red-900/20 text-red-800 border-red-900/30' : isRoast ? 'arena-badge-roast' : 'arena-badge-hottake'}`}>
-            {isUnderground ? '\u2620\uFE0F Underground' : isRoast ? '\uD83D\uDD25 Roast' : '\uD83C\uDF36\uFE0F Hot Take'}
+            <ArenaIcon type={isUnderground ? 'underground' : isRoast ? 'roast' : 'hottake'} size={14} className="inline align-[-2px]" />{' '}
+            {isUnderground ? 'Underground' : isRoast ? 'Roast' : 'Hot Take'}
           </span>
           {isLive && (
             <span className="arena-live-indicator">

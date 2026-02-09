@@ -40,9 +40,19 @@ export async function GET(request: Request) {
 
   if (profileError || !profile) {
     // Profile doesn't exist yet — create it (handles existing users before this migration)
-    const username = user.user_metadata?.x_handle
-      || user.email?.split('@')[0]
+    let username = user.email?.split('@')[0]
       || `user_${user.id.substring(0, 8)}`;
+
+    // Handle username collision (UNIQUE constraint on profiles.username)
+    const { data: existingUsername } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .single();
+
+    if (existingUsername) {
+      username = `${username}_${user.id.substring(0, 6)}`;
+    }
 
     const { data: newProfile, error: createError } = await admin
       .from('profiles')
