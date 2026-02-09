@@ -222,53 +222,64 @@ export default function UndergroundArenaPage() {
 
   return (
     <Layout>
-      {/* Arena Header */}
-      <div className="bg-gradient-to-b from-red-950/20 to-transparent border-b border-red-900/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="text-center md:text-left">
+      {/* ===== HERO HEADER ===== */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-red-950/15 via-red-950/5 to-transparent" />
+        <div className="absolute inset-0" style={{
+          background: 'radial-gradient(ellipse at center top, rgba(127,29,29,0.08) 0%, transparent 60%)',
+        }} />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+            <div className="text-center md:text-left animate-fade-in-up">
+              <div className="w-16 h-[2px] bg-gradient-to-r from-red-800 to-transparent mb-6 mx-auto md:mx-0" />
+
+              <p className="text-red-800/40 text-[10px] uppercase tracking-[0.3em] font-serif mb-3">
+                Where rules go to die
+              </p>
+
               <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
                 <ArenaIcon type="underground" size={48} className="text-red-800" />
                 <h1 className="font-serif font-black text-4xl md:text-5xl text-brown">
                   The <span className="text-red-800">Underground</span>
                 </h1>
               </div>
-              <p className="text-bronze/80 text-lg max-w-xl leading-relaxed">
-                No rules. No restrictions. No mercy. Three AI judges score on impact, creativity,
-                audacity, and entertainment. Only the bold survive.
+              <p className="text-bronze/70 text-lg max-w-xl leading-relaxed font-light">
+                No rules. No mercy. No crowd vote. Three AI judges watch from the shadows
+                and score on raw impact, creativity, audacity, and entertainment.
+                Only the bold descend here.
               </p>
 
-              {/* Stats */}
-              <div className="flex items-center justify-center md:justify-start gap-6 mt-6">
+              <div className="flex items-center justify-center md:justify-start gap-6 mt-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                 {liveBattles.length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="live-dot" />
-                    <span className="text-red-800 font-bold">{liveBattles.length} live</span>
+                    <span className="text-red-800 font-bold text-sm">{liveBattles.length} live</span>
                   </div>
                 )}
-                <span className="text-bronze/60 text-sm">
-                  {totalBattles} battles
+                <span className="text-bronze/50 text-sm font-serif">
+                  {totalBattles} battles fought
                 </span>
-                <span className="text-red-800/60 text-sm font-serif font-bold">
+                <span className="text-red-800/70 text-sm font-serif font-bold tracking-wider">
                   2x REWARDS
                 </span>
               </div>
             </div>
 
             {/* CTA / Gate */}
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               {!user ? (
                 <Link href="/login" className="btn-enter-arena bg-red-900/80 hover:bg-red-900 border-red-800/50">
                   <ArenaIcon type="underground" size={16} className="inline" /> Sign In to Enter
                 </Link>
               ) : !hasAccess ? (
                 <div className="text-center">
-                  <div className="px-6 py-4 bg-red-950/20 border border-red-900/30 rounded-lg">
-                    <p className="text-red-800 font-serif font-bold text-lg">&#128274; Honor Gate</p>
-                    <p className="text-bronze/60 text-sm mt-2">
-                      Requires <span className="text-red-800 font-bold">100 Honor</span> to enter
+                  <div className="premium-card px-8 py-6 border-red-900/20">
+                    <p className="text-red-800 font-serif font-black text-xl mb-2">Honor Gate</p>
+                    <p className="text-bronze/60 text-sm font-serif">
+                      Requires <span className="text-red-800 font-bold">100 Honor</span> to descend
                     </p>
-                    <p className="text-bronze/40 text-xs mt-1">
+                    <p className="text-bronze/40 text-xs mt-2 font-serif">
                       Your Honor: {profile?.honor ?? 0}
                     </p>
                   </div>
@@ -281,21 +292,26 @@ export default function UndergroundArenaPage() {
                   >
                     <ArenaIcon type="underground" size={16} className="inline" /> Enter the Underground
                   </button>
-                  <p className="text-bronze/50 text-xs">No rules. No mercy. 2x rewards.</p>
+                  <p className="text-bronze/40 text-[10px] uppercase tracking-[0.2em] font-serif">
+                    No rules. No mercy. 2x rewards.
+                  </p>
                 </>
               )}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="iron-line max-w-7xl mx-auto" />
+      </section>
+
+      {/* ===== BATTLES ===== */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="card-travertine p-6 animate-pulse">
-                <div className="h-5 bg-red-900/20 rounded w-1/4 mb-4" />
-                <div className="h-8 bg-red-900/10 rounded w-full" />
+              <div key={i} className="premium-card p-6 animate-pulse">
+                <div className="h-5 bg-red-900/10 rounded w-1/4 mb-4" />
+                <div className="h-8 bg-red-900/5 rounded w-full" />
               </div>
             ))}
           </div>
@@ -304,78 +320,81 @@ export default function UndergroundArenaPage() {
             {/* Live Battles Section */}
             {liveBattles.length > 0 && (
               <section className="mb-12 animate-fade-in-up">
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="live-dot" />
-                  <h2 className="font-serif font-bold text-xl text-brown">Live Underground Battles</h2>
-                  <span className="text-bronze/50 text-sm">&mdash; happening now</span>
-                </div>
-                <div className="space-y-4">
-                  {liveBattles.map((battle, index) => (
-                    <div
-                      key={battle.id}
-                      className="animate-fade-in-up"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <BattleCard battle={battle} />
-                    </div>
-                  ))}
+                <div className="premium-card p-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <span className="live-dot" />
+                    <h2 className="section-heading text-sm text-red-800">Live Underground Battles</h2>
+                  </div>
+                  <div className="space-y-4">
+                    {liveBattles.map((battle, index) => (
+                      <div
+                        key={battle.id}
+                        className="animate-fade-in-up"
+                        style={{ animationDelay: `${index * 100}ms` }}
+                      >
+                        <BattleCard battle={battle} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </section>
             )}
 
             {/* Recent Battles */}
             <section className="animate-fade-in-up delay-200">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-serif font-bold text-xl text-brown">Recent Underground Battles</h2>
-              </div>
+              <div className="premium-card p-6">
+                <h2 className="section-heading text-sm text-bronze mb-6">Recent Underground Battles</h2>
 
-              {completedBattles.length > 0 ? (
-                <div className="space-y-4">
-                  {completedBattles.map((battle, index) => (
-                    <div
-                      key={battle.id}
-                      className="animate-fade-in-up"
-                      style={{ animationDelay: `${(index + liveBattles.length) * 100}ms` }}
-                    >
-                      <BattleCard battle={battle} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="card-travertine p-12 text-center">
-                  <p className="text-bronze/60 font-serif italic">
-                    No underground battles yet. The arena awaits its first blood.
-                  </p>
-                </div>
-              )}
+                {completedBattles.length > 0 ? (
+                  <div className="space-y-4">
+                    {completedBattles.map((battle, index) => (
+                      <div
+                        key={battle.id}
+                        className="animate-fade-in-up"
+                        style={{ animationDelay: `${(index + liveBattles.length) * 100}ms` }}
+                      >
+                        <BattleCard battle={battle} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-bronze/50 font-serif italic text-sm">
+                      No blood has been spilled yet. The arena awaits its first sacrifice.
+                    </p>
+                  </div>
+                )}
+              </div>
             </section>
           </>
         )}
 
         {/* How It Works */}
         <section className="mt-16 animate-fade-in-up delay-300">
-          <h2 className="font-serif font-bold text-xl text-brown mb-6 text-center">How The Underground Works</h2>
-          <div className="grid md:grid-cols-4 gap-4">
-            <div className="card-travertine p-6 text-center border-red-900/10">
-              <div className="text-3xl mb-3">&#128274;</div>
-              <h3 className="font-serif font-bold text-brown mb-2">Honor Gate</h3>
-              <p className="text-bronze/60 text-sm">100+ Honor required to enter</p>
-            </div>
-            <div className="card-travertine p-6 text-center border-red-900/10">
-              <div className="text-3xl mb-3">&#9760;&#65039;</div>
-              <h3 className="font-serif font-bold text-brown mb-2">No Rules</h3>
-              <p className="text-bronze/60 text-sm">No topic restrictions. No format. No mercy.</p>
-            </div>
-            <div className="card-travertine p-6 text-center border-red-900/10">
-              <div className="text-3xl mb-3">&#9878;&#65039;</div>
-              <h3 className="font-serif font-bold text-brown mb-2">3 AI Judges</h3>
-              <p className="text-bronze/60 text-sm">Scored on impact, creativity, audacity, entertainment</p>
-            </div>
-            <div className="card-travertine p-6 text-center border-red-900/10">
-              <div className="text-3xl mb-3">&#10007;2</div>
-              <h3 className="font-serif font-bold text-brown mb-2">Double Rewards</h3>
-              <p className="text-bronze/60 text-sm">2x Honor for winners. Higher stakes.</p>
-            </div>
+          <div className="text-center mb-10">
+            <div className="w-12 h-[2px] bg-gradient-to-r from-red-800 to-transparent mx-auto mb-6" />
+            <h2 className="font-serif font-black text-2xl md:text-3xl text-brown tracking-tight">
+              The <span className="text-red-800">Rules</span> of the Underground
+            </h2>
+            <p className="text-bronze/50 text-sm font-serif mt-2">There is only one rule: there are no rules.</p>
+          </div>
+          <div className="grid md:grid-cols-4 gap-6">
+            {[
+              { icon: '\u{1F512}', title: 'Honor Gate', desc: '100+ Honor required. Only the proven descend.' },
+              { icon: '\u2620\uFE0F', title: 'No Restraint', desc: 'No topic. No format. No filter. Say what must be said.' },
+              { icon: '\u2696\uFE0F', title: '3 AI Judges', desc: 'Impact. Creativity. Audacity. Entertainment. Scored blind.' },
+              { icon: '\u00D72', title: 'Double Rewards', desc: '2x Honor to the victor. Higher stakes. Higher glory.' },
+            ].map((item, index) => (
+              <div
+                key={item.title}
+                className="premium-card p-6 text-center animate-fade-in-up"
+                style={{ animationDelay: `${0.4 + index * 0.1}s` }}
+              >
+                <div className="text-3xl mb-3">{item.icon}</div>
+                <h3 className="font-serif font-bold text-brown mb-2">{item.title}</h3>
+                <p className="text-bronze/60 text-sm">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
       </div>
