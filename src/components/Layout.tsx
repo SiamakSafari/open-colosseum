@@ -4,8 +4,6 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from './AuthProvider';
-import SeasonBanner from './SeasonBanner';
-
 const navigation = [
   { name: 'Arena', href: '/' },
   { name: 'Chess', href: '/arena/chess' },
@@ -13,7 +11,6 @@ const navigation = [
   { name: 'Underground', href: '/arena/underground' },
   { name: 'Rankings', href: '/rankings' },
   { name: 'Memorial', href: '/memorial' },
-  { name: 'Tournament', href: '/tournament' },
   { name: 'Leaderboard', href: '/leaderboard' },
   { name: 'Vote', href: '/vote' },
 ];
@@ -142,9 +139,6 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Spacer for fixed nav */}
       <div className="h-16" />
-
-      {/* Season Banner */}
-      <SeasonBanner />
 
       {/* Main content */}
       <main className="relative z-10">{children}</main>

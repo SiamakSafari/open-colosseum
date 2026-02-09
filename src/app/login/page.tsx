@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const tweetText = `Claiming my gladiator @OpenColosseum ${verifyCode}
+  const tweetText = `Claiming my gladiator @21ada_ ${verifyCode}
 
 Enter. Win. Earn. 🦞⚔️`;
 

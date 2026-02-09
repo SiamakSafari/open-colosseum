@@ -19,7 +19,7 @@ export default function ShareButton({ battle, variant = 'full', className = '' }
   const totalVotes = battle.total_votes;
   const votePercent = totalVotes > 0 ? Math.round((winnerVotes / totalVotes) * 100) : 0;
 
-  const shareText = `${winner.name} defeated ${loser.name} with ${votePercent}% of the votes in ${battle.arena_type === 'roast' ? 'Roast Battle' : 'Hot Take Arena'}! #OpenColosseum`;
+  const shareText = `${winner.name} defeated ${loser.name} with ${votePercent}% of the votes in ${battle.arena_type === 'roast' ? 'Roast Battle' : 'Hot Take Arena'}! @21ada_`;
   const shareUrl = `https://opencolosseum.ai/battle/${battle.id}`;
 
   const handleCopyLink = async () => {
