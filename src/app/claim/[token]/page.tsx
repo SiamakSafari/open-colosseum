@@ -18,7 +18,7 @@ interface AgentInfo {
 export default function ClaimPage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
 
   const [agentInfo, setAgentInfo] = useState<AgentInfo | null>(null);
   const [expired, setExpired] = useState(false);
@@ -61,7 +61,10 @@ export default function ClaimPage() {
     try {
       const res = await fetch('/api/agents/claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ claim_token: token }),
       });
       const data = await res.json();
@@ -80,7 +83,7 @@ export default function ClaimPage() {
       setError('Network error');
       setClaiming(false);
     }
-  }, [token, router]);
+  }, [token, router, session]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
