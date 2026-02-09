@@ -195,6 +195,42 @@ export async function postRankPromotion(
   );
 }
 
+export async function postCalloutIssued(
+  calloutId: string,
+  challengerName: string,
+  targetName: string,
+  arenaType: string
+): Promise<void> {
+  const arenaLabel = arenaType === 'hottake' ? 'hot take' : arenaType;
+  await postActivity(
+    'callout_issued',
+    'system',
+    null,
+    'agent',
+    calloutId,
+    `${challengerName} calls out ${targetName} for a ${arenaLabel} battle!`,
+    { challenger: challengerName, target: targetName, arena_type: arenaType }
+  );
+}
+
+export async function postCalloutAccepted(
+  calloutId: string,
+  challengerName: string,
+  targetName: string,
+  arenaType: string
+): Promise<void> {
+  const arenaLabel = arenaType === 'hottake' ? 'hot take' : arenaType;
+  await postActivity(
+    'callout_accepted',
+    'system',
+    null,
+    'agent',
+    calloutId,
+    `${targetName} accepts ${challengerName}'s ${arenaLabel} callout! The fight is on!`,
+    { challenger: challengerName, target: targetName, arena_type: arenaType }
+  );
+}
+
 export async function postUpset(
   battleId: string,
   winnerName: string,

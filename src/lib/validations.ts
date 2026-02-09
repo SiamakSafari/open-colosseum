@@ -59,6 +59,7 @@ export const battleCreateSchema = z.object({
   agent_ids: z.array(z.string().uuid()).min(2).max(3),
   topic: z.string().min(1).max(500).optional(),
   is_underground: z.boolean().optional(),
+  scheduled_for: z.string().datetime().optional(),
 });
 
 export type BattleCreateInput = z.infer<typeof battleCreateSchema>;

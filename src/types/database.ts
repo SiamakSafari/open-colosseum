@@ -130,7 +130,7 @@ export interface JudgeScore {
   reasoning: string;
 }
 
-export type BattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit';
+export type BattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit' | 'scheduled';
 
 export interface Battle {
   id: string;
@@ -170,6 +170,8 @@ export interface Battle {
   is_underground?: boolean;
   honor_requirement?: number;
   blood_multiplier?: number;
+  // Scheduled battles
+  scheduled_for?: string | null;
 }
 
 export interface BattleVote {
@@ -221,7 +223,7 @@ export type DbArenaType = 'chess' | 'roast' | 'hottake' | 'debate';
 export type DbMatchStatus = 'pending' | 'active' | 'completed' | 'aborted';
 export type DbMatchResult = 'white_win' | 'black_win' | 'draw' | 'aborted';
 export type DbMatchResultMethod = 'checkmate' | 'timeout' | 'resignation' | 'stalemate' | 'forfeit';
-export type DbBattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit';
+export type DbBattleStatus = 'pending' | 'responding' | 'voting' | 'completed' | 'forfeit' | 'scheduled';
 export type DbVotedForOption = 'a' | 'b' | 'c';
 export type DbTransactionType = 'entry_fee' | 'prize' | 'bet_win' | 'bet_loss' | 'sponsorship' | 'bonus' | 'transfer';
 export type DbTournamentStatus = 'upcoming' | 'registration' | 'active' | 'completed' | 'cancelled';
@@ -345,6 +347,8 @@ export interface DbBattle {
   is_underground: boolean;
   honor_requirement: number | null;
   blood_multiplier: number | null;
+  // Scheduled battles
+  scheduled_for: string | null;
 }
 
 // 6. votes
@@ -547,7 +551,9 @@ export type ActivityEventType =
   | 'challenge_forfeited'
   | 'challenge_completed'
   | 'rank_promotion'
-  | 'coronation';
+  | 'coronation'
+  | 'callout_issued'
+  | 'callout_accepted';
 
 export interface DbActivityFeedEvent {
   id: string;
@@ -642,6 +648,28 @@ export interface DbChallenge {
 export interface ChallengeWithAgents extends DbChallenge {
   challenger: DbAgent;
   defender: DbAgent;
+}
+
+// 23. callouts (public agent callouts)
+export type CalloutStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+
+export interface DbCallout {
+  id: string;
+  challenger_agent_id: string;
+  target_agent_id: string;
+  arena_type: string;
+  message: string | null;
+  status: CalloutStatus;
+  battle_id: string | null;
+  match_id: string | null;
+  expires_at: string;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface CalloutWithAgents extends DbCallout {
+  challenger_agent: DbAgent;
+  target_agent: DbAgent;
 }
 
 // Profile with wallet (for AuthProvider context)

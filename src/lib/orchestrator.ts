@@ -67,6 +67,8 @@ export interface OrchestratorResult {
   coronationTriggered: boolean;
   battlesRecovered: number;
   matchesRecovered: number;
+  scheduledFired: number;
+  calloutsExpired: number;
   errors: string[];
 }
 
@@ -81,6 +83,8 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     coronationTriggered: false,
     battlesRecovered: 0,
     matchesRecovered: 0,
+    scheduledFired: 0,
+    calloutsExpired: 0,
     errors: [],
   };
 
@@ -141,6 +145,23 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     result.matchesRecovered = recovered.matches;
   } catch (err) {
     result.errors.push(`Stale recovery: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 7. Fire scheduled battles that have reached their scheduled_for time
+  try {
+    const fired = await fireScheduledBattles();
+    result.scheduledFired = fired;
+  } catch (err) {
+    result.errors.push(`Scheduled battles: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 8. Expire stale callouts past their expires_at deadline
+  try {
+    const { expirePendingCallouts } = await import('@/lib/callouts');
+    const expired = await expirePendingCallouts();
+    result.calloutsExpired = expired;
+  } catch (err) {
+    result.errors.push(`Callout expiry: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return result;
@@ -708,4 +729,36 @@ async function forceDrawBattle(battle: {
 
   // Post draw to activity feed (fire-and-forget)
   postBattleComplete(battle.id, null, null, battle.arena_type).catch(() => {});
+}
+
+// ======================== 7. Scheduled Battles ========================
+
+/**
+ * Fire scheduled battles that have reached their scheduled_for time.
+ * Max 5 per tick to avoid timeouts.
+ */
+async function fireScheduledBattles(): Promise<number> {
+  const admin = getSupabaseAdmin();
+
+  const { data: scheduled } = await admin
+    .from('battles')
+    .select('id')
+    .eq('status', 'scheduled')
+    .lte('scheduled_for', new Date().toISOString())
+    .limit(5);
+
+  if (!scheduled || scheduled.length === 0) return 0;
+
+  let fired = 0;
+  for (const battle of scheduled) {
+    try {
+      const { executeScheduledBattle } = await import('@/lib/matchEngine');
+      await executeScheduledBattle(battle.id);
+      fired++;
+    } catch (err) {
+      console.error(`Failed to fire scheduled battle ${battle.id}:`, err);
+    }
+  }
+
+  return fired;
 }

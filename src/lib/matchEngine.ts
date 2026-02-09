@@ -727,10 +727,61 @@ async function awardUndergroundHonor(winnerAgentId: string): Promise<void> {
     .eq('id', agent.user_id);
 }
 
+// ======================== Auto-Settlement (0-vote judge) ========================
+
+const JUDGE_MODEL = 'claude 3.5 haiku';
+
+/**
+ * Judge a battle with 0 votes using Haiku AI instead of defaulting to draw.
+ * Returns the winning side ('a' or 'b') or null for draw.
+ */
+async function judgeZeroVoteBattle(
+  battleId: string,
+  responseA: string,
+  responseB: string,
+  arenaType: string,
+  topic: string
+): Promise<{ winner: 'a' | 'b' | null; reason: string }> {
+  try {
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: `You are a battle judge in an AI arena. Two agents competed in a "${arenaType}" battle about: "${topic}". No audience votes were cast, so you must decide the winner.
+
+Response A:
+${responseA}
+
+Response B:
+${responseB}
+
+Evaluate both responses on creativity, impact, entertainment value, and relevance. Pick the winner. Return ONLY a JSON object (no markdown): {"winner": "a" or "b", "reason": "one sentence explanation"}. If truly equal, return {"winner": null, "reason": "explanation"}.`,
+      },
+    ];
+
+    const response = await getCompletion({
+      model: JUDGE_MODEL,
+      messages,
+      maxTokens: 200,
+      temperature: 0.3,
+    });
+
+    const cleaned = response.content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      winner: parsed.winner === 'a' || parsed.winner === 'b' ? parsed.winner : null,
+      reason: parsed.reason || 'No explanation provided',
+    };
+  } catch (err) {
+    console.error('Zero-vote judge failed, defaulting to draw:', err);
+    return { winner: null, reason: 'Judge unavailable — declared draw' };
+  }
+}
+
 // ======================== ELO Settlement ========================
 
 /**
  * Settle a battle: determine winner from votes, update ELO.
+ * If a 2-way battle has 0 votes on both sides, uses AI judge instead of draw.
  */
 export async function settleBattle(battleId: string): Promise<MatchResult> {
   const admin = getSupabaseAdmin();
@@ -773,6 +824,27 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
       winnerId = battle.agent_a_id;
     } else if (battle.votes_b > battle.votes_a) {
       winnerId = battle.agent_b_id;
+    } else if (battle.votes_a === 0 && battle.votes_b === 0 && battle.response_a && battle.response_b) {
+      // 0 votes on both sides — use AI judge instead of defaulting to draw
+      const judgeResult = await judgeZeroVoteBattle(
+        battleId,
+        battle.response_a,
+        battle.response_b,
+        battle.arena_type,
+        battle.prompt
+      );
+      if (judgeResult.winner === 'a') {
+        winnerId = battle.agent_a_id;
+      } else if (judgeResult.winner === 'b') {
+        winnerId = battle.agent_b_id;
+      } else {
+        isDraw = true;
+      }
+      // Store the judge reason in post_match_summary
+      await admin
+        .from('battles')
+        .update({ post_match_summary: `[AI Judge] ${judgeResult.reason}` })
+        .eq('id', battleId);
     } else {
       isDraw = true;
     }
@@ -965,7 +1037,44 @@ async function settleBattleBets(
 }
 
 /**
- * Push a battle summary to each agent's battle_memory JSONB (FIFO, max 5).
+ * Generate a tactical summary of a battle via Haiku AI.
+ */
+async function generateBattleSummary(
+  responseA: string,
+  responseB: string,
+  winner: 'a' | 'b' | null,
+  arenaType: ArenaType
+): Promise<string> {
+  try {
+    const messages: AIMessage[] = [
+      {
+        role: 'user',
+        content: `Summarize this ${arenaType} battle tactically in 1-2 sentences. What worked for the ${winner ? 'winner' : 'both sides'}, what didn't? Be concise and useful for future strategy.
+
+Response A${winner === 'a' ? ' (winner)' : winner === 'b' ? ' (loser)' : ''}:
+${responseA.slice(0, 500)}
+
+Response B${winner === 'b' ? ' (winner)' : winner === 'a' ? ' (loser)' : ''}:
+${responseB.slice(0, 500)}`,
+      },
+    ];
+
+    const response = await getCompletion({
+      model: JUDGE_MODEL,
+      messages,
+      maxTokens: 150,
+      temperature: 0.5,
+    });
+
+    return response.content.trim();
+  } catch {
+    return winner ? 'Decisive victory through superior strategy.' : 'Evenly matched contest.';
+  }
+}
+
+/**
+ * Push a battle summary to each agent's battle_memory JSONB (FIFO, max 10).
+ * Includes AI-generated tactical summaries.
  */
 async function updateBattleMemory(
   battle: Record<string, unknown>,
@@ -976,9 +1085,23 @@ async function updateBattleMemory(
   const agentIds = [battle.agent_a_id as string, battle.agent_b_id as string];
   if (battle.agent_c_id) agentIds.push(battle.agent_c_id as string);
 
-  // Fetch agent names
+  // Fetch agent names and current battle responses
   const { data: agents } = await admin.from('agents').select('id, name, battle_memory').in('id', agentIds);
   if (!agents) return;
+
+  // Fetch battle responses for AI summary
+  const { data: battleData } = await admin
+    .from('battles')
+    .select('response_a, response_b')
+    .eq('id', battle.id as string)
+    .single();
+
+  // Generate tactical summary if responses available
+  let summary: string | undefined;
+  if (battleData?.response_a && battleData?.response_b) {
+    const winnerSide = winnerId === battle.agent_a_id ? 'a' as const : winnerId === battle.agent_b_id ? 'b' as const : null;
+    summary = await generateBattleSummary(battleData.response_a, battleData.response_b, winnerSide, arenaType);
+  }
 
   const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
   const now = new Date().toISOString();
@@ -990,15 +1113,16 @@ async function updateBattleMemory(
     const opponents = agentIds.filter(id => id !== agentId).map(id => agentMap[id]?.name || 'Unknown');
     const result = winnerId === agentId ? 'win' : winnerId ? 'loss' : 'draw';
 
-    const entry = {
+    const entry: Record<string, unknown> = {
       opponent: opponents.join(' & '),
       result,
       arena: arenaType,
       date: now,
     };
+    if (summary) entry.summary = summary;
 
     const existing = Array.isArray(agent.battle_memory) ? agent.battle_memory : [];
-    const updated = [entry, ...existing].slice(0, 5);
+    const updated = [entry, ...existing].slice(0, 10);
 
     await admin.from('agents').update({ battle_memory: updated }).eq('id', agentId);
   }
@@ -1096,6 +1220,47 @@ async function updateAgentStats(
       total_matches: currentStats.total_matches + 1,
     })
     .eq('id', currentStats.id);
+}
+
+// ======================== Scheduled Battle Execution ========================
+
+/**
+ * Execute a scheduled battle that has reached its scheduled_for time.
+ * Transitions it from 'scheduled' to 'responding' and runs the appropriate battle starter.
+ */
+export async function executeScheduledBattle(battleId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: battle, error } = await admin
+    .from('battles')
+    .select('*')
+    .eq('id', battleId)
+    .eq('status', 'scheduled')
+    .single();
+
+  if (error || !battle) {
+    throw new Error(`Scheduled battle not found or not in scheduled state: ${battleId}`);
+  }
+
+  // Delete the scheduled row and create a real battle via the appropriate starter
+  // First, delete the placeholder
+  await admin.from('battles').delete().eq('id', battleId);
+
+  // Now run the real battle through the normal flow
+  const arenaType = battle.arena_type as ArenaType;
+  const isUnderground = battle.is_underground;
+
+  if (arenaType === 'roast' && isUnderground) {
+    await startUndergroundBattle(battle.agent_a_id, battle.agent_b_id);
+  } else if (arenaType === 'roast') {
+    await startRoastBattle(battle.agent_a_id, battle.agent_b_id);
+  } else if (arenaType === 'hottake') {
+    await startHotTakeBattle(battle.agent_a_id, battle.agent_b_id, battle.prompt);
+  } else if (arenaType === 'debate' && battle.agent_c_id) {
+    await startDebate(battle.agent_a_id, battle.agent_b_id, battle.agent_c_id, battle.prompt);
+  } else {
+    throw new Error(`Cannot execute scheduled battle with arena_type=${arenaType}`);
+  }
 }
 
 // ======================== Legacy Interface ========================

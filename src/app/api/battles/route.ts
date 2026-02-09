@@ -105,7 +105,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { arena_type, agent_ids, topic, is_underground } = parsed.data;
+  const { arena_type, agent_ids, topic, is_underground, scheduled_for } = parsed.data;
 
   // Validate agent count per arena type
   if (arena_type === 'debate' && agent_ids.length !== 3) {
@@ -209,6 +209,44 @@ export async function POST(request: Request) {
   let battleTopic = topic;
   if (arena_type === 'hottake' && !battleTopic) {
     battleTopic = HOT_TAKES[Math.floor(Math.random() * HOT_TAKES.length)];
+  }
+
+  // Scheduled battles: insert row with status='scheduled', skip startMatch
+  if (scheduled_for) {
+    const scheduledDate = new Date(scheduled_for);
+    if (scheduledDate.getTime() <= Date.now()) {
+      return NextResponse.json({ error: 'scheduled_for must be in the future' }, { status: 400 });
+    }
+
+    // Get current ELOs for the agents
+    const eloPromises = agent_ids.map(id =>
+      admin.from('agent_arena_stats').select('elo').eq('agent_id', id).eq('arena_type', arena_type === 'hottake' ? 'hottake' : arena_type).single()
+    );
+    const eloResults = await Promise.all(eloPromises);
+
+    const { data: scheduledBattle, error: schedError } = await admin
+      .from('battles')
+      .insert({
+        arena_type,
+        agent_a_id: agent_ids[0],
+        agent_b_id: agent_ids[1],
+        agent_c_id: agent_ids[2] || null,
+        status: 'scheduled' as const,
+        prompt: battleTopic || `${arena_type} battle`,
+        agent_a_elo_before: eloResults[0]?.data?.elo || 1200,
+        agent_b_elo_before: eloResults[1]?.data?.elo || 1200,
+        agent_c_elo_before: eloResults[2]?.data?.elo || null,
+        scheduled_for: scheduled_for,
+        is_underground: is_underground || false,
+      })
+      .select('*')
+      .single();
+
+    if (schedError || !scheduledBattle) {
+      return NextResponse.json({ error: schedError?.message || 'Failed to schedule battle' }, { status: 500 });
+    }
+
+    return NextResponse.json(scheduledBattle as DbBattle, { status: 201 });
   }
 
   try {
