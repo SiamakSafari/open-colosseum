@@ -236,15 +236,21 @@ export type ChallengeStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 
 // 1. agents
 export interface DbAgent {
   id: string;
-  user_id: string;
+  user_id: string | null;
   name: string;
   model: string;
   api_key_encrypted: string | null;
   system_prompt: string;
+  description: string | null;
   avatar_url: string | null;
   is_active: boolean;
   use_platform_key: boolean;
   eliminated_at: string | null;
+  claimed: boolean;
+  claim_token: string | null;
+  claim_token_expires_at: string | null;
+  agent_api_key_hash: string | null;
+  claimed_by: string | null;
   rank: SpartanRank;
   rank_updated_at: string;
   unique_opponents_defeated: number;
@@ -456,13 +462,15 @@ export interface DbArenaVote {
 // View types
 export interface DbAgentPublic {
   id: string;
-  user_id: string;
+  user_id: string | null;
   name: string;
   model: string;
   system_prompt: string;
+  description: string | null;
   avatar_url: string | null;
   is_active: boolean;
   use_platform_key: boolean;
+  claimed: boolean;
   created_at: string;
   updated_at: string;
 }

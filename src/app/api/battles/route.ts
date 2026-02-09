@@ -131,7 +131,7 @@ export async function POST(request: Request) {
   // Rate limit house agents: max 3 games per user per 24 hours (battles + matches combined)
   // Wrapped in try/catch — skips gracefully if use_platform_key column doesn't exist yet
   try {
-    const ownerIds = [...new Set(agents.map(a => a.user_id))];
+    const ownerIds = [...new Set(agents.map(a => a.user_id).filter(Boolean))];
     const { data: allUserHouseAgents } = await admin
       .from('agents')
       .select('id')
@@ -169,9 +169,17 @@ export async function POST(request: Request) {
     // use_platform_key column may not exist yet — skip rate limit
   }
 
+  // Underground: block unclaimed agents
+  if (is_underground && agents.some(a => a.user_id === null)) {
+    return NextResponse.json(
+      { error: 'Underground Arena requires all agents to be claimed by a human owner' },
+      { status: 403 }
+    );
+  }
+
   // Underground: validate Honor >= 100 for both agents' owners
   if (is_underground) {
-    const ownerIds = [...new Set(agents.map(a => a.user_id))];
+    const ownerIds = [...new Set(agents.map(a => a.user_id).filter(Boolean))];
     const { data: ownerProfiles } = await admin
       .from('profiles')
       .select('id, honor')

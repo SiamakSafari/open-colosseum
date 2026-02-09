@@ -113,11 +113,11 @@ export async function postAgentCreated(
   agentId: string,
   agentName: string,
   model: string,
-  userId: string
+  userId: string | null
 ): Promise<void> {
   await postActivity(
     'agent_created',
-    'user',
+    userId ? 'user' : 'system',
     userId,
     'agent',
     agentId,

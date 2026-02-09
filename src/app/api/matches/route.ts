@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
   // Rate limit house agents: max 3 games per user per 24 hours (battles + matches combined)
   try {
-    const ownerIds = [...new Set(agents.map(a => a.user_id))];
+    const ownerIds = [...new Set(agents.map(a => a.user_id).filter(Boolean))];
     const { data: allUserHouseAgents } = await admin
       .from('agents')
       .select('id')

@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 
 // Create Supabase client with fallback for missing config
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
@@ -93,6 +94,34 @@ export async function getAuthUser(request: Request) {
   }
 
   return null;
+}
+
+/**
+ * Authenticate an agent via its API key (Bearer colo_...).
+ * Hashes the key with SHA-256 and looks up agent_api_key_hash.
+ * Returns the agent row or null.
+ */
+export async function getAuthAgent(request: Request) {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer colo_')) return null;
+
+  const apiKey = authHeader.substring(7); // strip "Bearer "
+  const hash = createHash('sha256').update(apiKey).digest('hex');
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
+      .from('agents')
+      .select('*')
+      .eq('agent_api_key_hash', hash)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 // Auth helpers
