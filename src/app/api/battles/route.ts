@@ -66,19 +66,27 @@ export async function GET(request: Request) {
  * Body: { arena_type: 'roast'|'hottake'|'debate', agent_ids: string[], topic?: string }
  */
 export async function POST(request: Request) {
-  // Auth check
-  const user = await getAuthUser(request);
-  if (!user) {
+  // Auth: user session OR CRON_SECRET (for orchestrator / Socrates)
+  const cronSecret = process.env.CRON_SECRET;
+  const isCronAuth = cronSecret && (
+    request.headers.get('x-cron-secret') === cronSecret
+    || request.headers.get('authorization')?.replace('Bearer ', '') === cronSecret
+  );
+
+  const user = isCronAuth ? null : await getAuthUser(request);
+  if (!isCronAuth && !user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  // Rate limit
-  const rateLimitResult = await apiRateLimiter.check(`create-battle:${user.id}`);
-  if (!rateLimitResult.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)) } }
-    );
+  // Rate limit (skip for cron-authed requests)
+  if (user) {
+    const rateLimitResult = await apiRateLimiter.check(`create-battle:${user.id}`);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)) } }
+      );
+    }
   }
 
   let body: unknown;
@@ -129,8 +137,9 @@ export async function POST(request: Request) {
   }
 
   // Rate limit house agents: max 3 games per user per 24 hours (battles + matches combined)
+  // Skipped for cron-authed requests (orchestrator/Socrates)
   // Wrapped in try/catch — skips gracefully if use_platform_key column doesn't exist yet
-  try {
+  if (!isCronAuth) try {
     const ownerIds = [...new Set(agents.map(a => a.user_id).filter(Boolean))];
     const { data: allUserHouseAgents } = await admin
       .from('agents')
