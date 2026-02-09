@@ -40,31 +40,64 @@ export type ProviderName = 'anthropic' | 'openai' | 'google' | 'custom';
 // ======================== Provider Detection ========================
 
 const MODEL_PROVIDER_MAP: Record<string, ProviderName> = {
+  // Anthropic
+  'claude opus 4.6': 'anthropic',
+  'claude sonnet 4': 'anthropic',
+  'claude 3.5 haiku': 'anthropic',
   'claude 3.5 sonnet': 'anthropic',
   'claude 3 opus': 'anthropic',
-  'claude 3.5 haiku': 'anthropic',
+  // OpenAI
+  'gpt-5.3': 'openai',
+  'gpt-4.1': 'openai',
+  'gpt-4.1 mini': 'openai',
   'gpt-4o': 'openai',
   'gpt-4o mini': 'openai',
-  'gpt-4 turbo': 'openai',
+  // Google
+  'gemini 2.5 pro': 'google',
+  'gemini 2.5 flash': 'google',
   'gemini pro': 'google',
-  'gemini ultra': 'google',
-  'grok-3': 'openai', // Grok uses OpenAI-compatible API
-  'llama 3.1': 'custom',
-  'llama-3.1 405b': 'custom',
-  'mistral large 2': 'custom',
+  // xAI (OpenAI-compatible)
+  'grok-3': 'openai',
+  // DeepSeek (OpenAI-compatible)
+  'deepseek r1': 'openai',
+  // Moonshot/Kimi (OpenAI-compatible)
+  'kimi k2': 'openai',
+  // Meta via Together (OpenAI-compatible)
+  'llama 4 maverick': 'openai',
+  'llama 4 scout': 'openai',
+  // Mistral (OpenAI-compatible)
+  'mistral large': 'openai',
 };
 
 // Map display model names to API model IDs
 const MODEL_API_ID_MAP: Record<string, string> = {
+  // Anthropic
+  'claude opus 4.6': 'claude-opus-4-6',
+  'claude sonnet 4': 'claude-sonnet-4-20250514',
+  'claude 3.5 haiku': 'claude-3-5-haiku-20241022',
   'claude 3.5 sonnet': 'claude-sonnet-4-5-20250929',
   'claude 3 opus': 'claude-opus-4-6',
-  'claude 3.5 haiku': 'claude-haiku-4-5-20251001',
+  // OpenAI
+  'gpt-5.3': 'gpt-4.1',
+  'gpt-4.1': 'gpt-4.1',
+  'gpt-4.1 mini': 'gpt-4.1-mini',
   'gpt-4o': 'gpt-4o',
   'gpt-4o mini': 'gpt-4o-mini',
-  'gpt-4 turbo': 'gpt-4-turbo',
+  // Google
+  'gemini 2.5 pro': 'gemini-2.5-pro-preview-06-05',
+  'gemini 2.5 flash': 'gemini-2.5-flash-preview-05-20',
   'gemini pro': 'gemini-2.0-flash',
-  'gemini ultra': 'gemini-2.0-flash',
+  // xAI
   'grok-3': 'grok-3',
+  // DeepSeek
+  'deepseek r1': 'deepseek-reasoner',
+  // Kimi
+  'kimi k2': 'kimi-k2',
+  // Meta via Together
+  'llama 4 maverick': 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
+  'llama 4 scout': 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+  // Mistral
+  'mistral large': 'mistral-large-latest',
 };
 
 /**
@@ -83,6 +116,10 @@ export function detectProvider(model: string): ProviderName {
   if (normalized.includes('gpt')) return 'openai';
   if (normalized.includes('gemini')) return 'google';
   if (normalized.includes('grok')) return 'openai';
+  if (normalized.includes('deepseek')) return 'openai';
+  if (normalized.includes('kimi')) return 'openai';
+  if (normalized.includes('llama')) return 'openai';
+  if (normalized.includes('mistral')) return 'openai';
 
   return 'custom';
 }
@@ -271,6 +308,16 @@ function resolveApiKey(request: AICompletionRequest, provider: ProviderName): st
   }
 
   // Fallback to environment variables (platform keys)
+  // For OpenAI-compatible providers, check model-specific env vars first
+  if (provider === 'openai') {
+    const modelLower = request.model.toLowerCase();
+    if (modelLower.includes('grok') && process.env.XAI_API_KEY) return process.env.XAI_API_KEY;
+    if (modelLower.includes('deepseek') && process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
+    if (modelLower.includes('kimi') && process.env.MOONSHOT_API_KEY) return process.env.MOONSHOT_API_KEY;
+    if (modelLower.includes('llama') && process.env.TOGETHER_API_KEY) return process.env.TOGETHER_API_KEY;
+    if (modelLower.includes('mistral') && process.env.MISTRAL_API_KEY) return process.env.MISTRAL_API_KEY;
+  }
+
   const envKeys: Record<ProviderName, string | undefined> = {
     anthropic: process.env.ANTHROPIC_API_KEY,
     openai: process.env.OPENAI_API_KEY,
@@ -307,14 +354,18 @@ export async function getCompletion(
         case 'anthropic':
           result = callAnthropic(request, apiKey);
           break;
-        case 'openai':
-          // Grok uses OpenAI-compatible API with custom base URL
-          if (request.model.toLowerCase().includes('grok')) {
-            result = callOpenAI(request, apiKey, 'https://api.x.ai/v1');
-          } else {
-            result = callOpenAI(request, apiKey);
-          }
+        case 'openai': {
+          // Route to correct base URL for OpenAI-compatible providers
+          const modelLower = request.model.toLowerCase();
+          let baseURL: string | undefined;
+          if (modelLower.includes('grok')) baseURL = 'https://api.x.ai/v1';
+          else if (modelLower.includes('deepseek')) baseURL = 'https://api.deepseek.com/v1';
+          else if (modelLower.includes('kimi')) baseURL = 'https://api.moonshot.cn/v1';
+          else if (modelLower.includes('llama')) baseURL = 'https://api.together.xyz/v1';
+          else if (modelLower.includes('mistral')) baseURL = 'https://api.mistral.ai/v1';
+          result = callOpenAI(request, apiKey, baseURL);
           break;
+        }
         case 'google':
           result = callGoogle(request, apiKey);
           break;

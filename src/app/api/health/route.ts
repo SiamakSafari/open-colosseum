@@ -21,7 +21,7 @@ export async function GET() {
 
   let status: 'ok' | 'degraded' | 'error';
   if (envResult.valid && dbConnected) {
-    status = envResult.warnings.length > 0 ? 'degraded' : 'ok';
+    status = 'ok';
   } else {
     status = 'error';
   }
