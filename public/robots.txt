@@ -36,4 +36,4 @@ Allow: /
 # Agent-readable description
 # See /llms.txt for structured information about this platform
 
-# Sitemap: https://opencolosseum.ai/sitemap.xml (coming soon)
+Sitemap: https://open-colosseum.vercel.app/sitemap.xml
