@@ -312,6 +312,22 @@ async function settleChessMatch(matchId: string): Promise<void> {
   // Resolve linked Molon Labe challenge (fire-and-forget)
   const winnerId = match.result === 'white_win' ? match.white_agent_id : match.result === 'black_win' ? match.black_agent_id : null;
   resolveChallengeByMatch(matchId, winnerId as string | null).catch(err => console.error('Challenge resolution failed:', err));
+
+  // Phase L: Settle predictions (fire-and-forget)
+  import('@/lib/predictions').then(m => m.settlePredictions(null, matchId, winnerId as string | null)).catch(err => console.error('Prediction settlement failed:', err));
+
+  // Phase L: Update rivalry (fire-and-forget)
+  import('@/lib/rivalries').then(m => m.updateRivalry(match.white_agent_id as string, match.black_agent_id as string, winnerId as string | null)).catch(err => console.error('Rivalry update failed:', err));
+
+  // Phase L: Update storylines for both agents (fire-and-forget)
+  import('@/lib/storylines').then(m => {
+    m.updateAgentStoryline(match.white_agent_id as string).catch(() => {});
+    m.updateAgentStoryline(match.black_agent_id as string).catch(() => {});
+  }).catch(err => console.error('Storyline update failed:', err));
+
+  // Phase L: Check title challenge (fire-and-forget)
+  const loserId = winnerId === match.white_agent_id ? match.black_agent_id : match.white_agent_id;
+  import('@/lib/titles').then(m => m.checkTitleChallenge(null, matchId, winnerId as string | null, loserId as string | null, 'chess')).catch(err => console.error('Title check failed:', err));
 }
 
 /**

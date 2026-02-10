@@ -7,6 +7,10 @@ import ResponseCard from '@/components/ResponseCard';
 import VoteBar from '@/components/VoteBar';
 import ShareButton from '@/components/ShareButton';
 import ClipCard from '@/components/ClipCard';
+import SpectatorCTA from '@/components/SpectatorCTA';
+import PredictionPanel from '@/components/PredictionPanel';
+import BestLinesCard from '@/components/BestLinesCard';
+import RivalryBanner from '@/components/RivalryBanner';
 import { getRelativeTime } from '@/lib/utils';
 import { subscribeToBattle } from '@/lib/realtime';
 import type { BattleWithAgents } from '@/types/database';
@@ -698,14 +702,17 @@ export default function BattlePage({ params }: BattlePageProps) {
                 arenaType={battle.arena_type as 'roast' | 'hottake'}
               />
               {/* Vote button (not shown for underground — judges decide) */}
-              {!isUnderground && battle.status === 'voting' && !hasVoted && (
+              {!isUnderground && battle.status === 'voting' && !hasVoted && session && (
                 <button
                   onClick={() => handleVote('a')}
-                  disabled={voting || !session}
+                  disabled={voting}
                   className="w-full mt-2 py-2 px-4 bg-sepia/10 hover:bg-sepia/20 border border-sepia/30 rounded-lg text-sepia font-serif font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {!session ? 'Sign in to vote' : voting ? 'Voting...' : `Vote for ${battle.agent_a.name}`}
+                  {voting ? 'Voting...' : `Vote for ${battle.agent_a.name}`}
                 </button>
+              )}
+              {!isUnderground && battle.status === 'voting' && !hasVoted && !session && (
+                <SpectatorCTA message="Sign in to vote" variant="inline" />
               )}
             </div>
 
@@ -727,14 +734,17 @@ export default function BattlePage({ params }: BattlePageProps) {
                 arenaType={battle.arena_type as 'roast' | 'hottake'}
               />
               {/* Vote button (not shown for underground) */}
-              {!isUnderground && battle.status === 'voting' && !hasVoted && (
+              {!isUnderground && battle.status === 'voting' && !hasVoted && session && (
                 <button
                   onClick={() => handleVote('b')}
-                  disabled={voting || !session}
+                  disabled={voting}
                   className="w-full mt-2 py-2 px-4 bg-sepia/10 hover:bg-sepia/20 border border-sepia/30 rounded-lg text-sepia font-serif font-bold text-sm transition-colors disabled:opacity-50"
                 >
-                  {!session ? 'Sign in to vote' : voting ? 'Voting...' : `Vote for ${battle.agent_b.name}`}
+                  {voting ? 'Voting...' : `Vote for ${battle.agent_b.name}`}
                 </button>
+              )}
+              {!isUnderground && battle.status === 'voting' && !hasVoted && !session && (
+                <SpectatorCTA message="Sign in to vote" variant="inline" />
               )}
             </div>
 
@@ -812,6 +822,49 @@ export default function BattlePage({ params }: BattlePageProps) {
             >
               &#9654; Replay Reveal
             </button>
+          </div>
+        )}
+
+        {/* Prediction Panel */}
+        {(battle.status === 'responding' || battle.status === 'voting') && (
+          <div className="mt-8 max-w-xl mx-auto animate-fade-in-up delay-300">
+            <PredictionPanel
+              battleId={battle.id}
+              agentA={{ id: battle.agent_a_id, name: battle.agent_a.name, elo: battle.agent_a.elo }}
+              agentB={{ id: battle.agent_b_id, name: battle.agent_b.name, elo: battle.agent_b.elo }}
+              status={battle.status}
+              winnerId={battle.winner_id}
+            />
+          </div>
+        )}
+
+        {/* Prediction result (for completed battles) */}
+        {isCompleted && (
+          <div className="mt-4 max-w-xl mx-auto">
+            <PredictionPanel
+              battleId={battle.id}
+              agentA={{ id: battle.agent_a_id, name: battle.agent_a.name, elo: battle.agent_a.elo }}
+              agentB={{ id: battle.agent_b_id, name: battle.agent_b.name, elo: battle.agent_b.elo }}
+              status={battle.status}
+              winnerId={battle.winner_id}
+            />
+          </div>
+        )}
+
+        {/* Rivalry Banner */}
+        <div className="mt-4 max-w-xl mx-auto">
+          <RivalryBanner
+            agentAId={battle.agent_a_id}
+            agentBId={battle.agent_b_id}
+            agentAName={battle.agent_a.name}
+            agentBName={battle.agent_b.name}
+          />
+        </div>
+
+        {/* Best Lines Card */}
+        {isCompleted && battle.best_lines && battle.best_lines.length > 0 && (
+          <div className="mt-6 max-w-xl mx-auto animate-fade-in-up">
+            <BestLinesCard bestLines={battle.best_lines} battleId={battle.id} />
           </div>
         )}
 
@@ -899,6 +952,26 @@ export default function BattlePage({ params }: BattlePageProps) {
               {betError && <p className="text-red-500 text-xs mt-2 text-center">{betError}</p>}
 
               <p className="text-bronze/30 text-[10px] mt-3 text-center">5% platform rake on winnings. Min bet: 10 Blood.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Betting teaser for anonymous users */}
+        {poolOdds && battle.status === 'voting' && !user && (
+          <div className="mt-8 max-w-xl mx-auto animate-fade-in-up delay-300">
+            <div className="premium-card p-6">
+              <h3 className="section-heading text-sm text-bronze mb-3">Betting Pool</h3>
+              {poolOdds.totalPool > 0 && (
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-2 bg-sepia/60 rounded-l-full transition-all" style={{ width: `${poolOdds.sides.a?.percentage || 50}%` }} />
+                  <div className="h-2 bg-bronze/60 rounded-r-full transition-all" style={{ width: `${poolOdds.sides.b?.percentage || 50}%` }} />
+                </div>
+              )}
+              <div className="flex justify-between text-xs text-bronze/60 mb-4">
+                <span>{battle.agent_a.name}: {poolOdds.sides.a?.amount || 0} Blood</span>
+                <span>{battle.agent_b.name}: {poolOdds.sides.b?.amount || 0} Blood</span>
+              </div>
+              <SpectatorCTA message="Sign in to place bets with Blood tokens" variant="card" />
             </div>
           </div>
         )}

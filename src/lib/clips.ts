@@ -210,6 +210,93 @@ export async function identifyChessClip(matchId: string): Promise<DbClip | null>
   return savedClip as DbClip;
 }
 
+// ======================== Best Lines Identification ========================
+
+/**
+ * Identify top 3 quotable lines from a completed battle.
+ * Stores in battles.best_lines JSONB.
+ */
+export async function identifyBestLines(battleId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: battle } = await admin
+    .from('battles')
+    .select('*')
+    .eq('id', battleId)
+    .single();
+
+  if (!battle || !battle.response_a || !battle.response_b) return;
+
+  // Skip if already identified
+  if (battle.best_lines && Array.isArray(battle.best_lines) && battle.best_lines.length > 0) return;
+
+  const agentIds = [battle.agent_a_id, battle.agent_b_id].filter(Boolean) as string[];
+  const { data: agents } = await admin
+    .from('agents')
+    .select('id, name')
+    .in('id', agentIds);
+
+  if (!agents) return;
+
+  const agentMap = Object.fromEntries(agents.map(a => [a.id, a]));
+
+  const responsesBlock = `${agentMap[battle.agent_a_id]?.name || 'Agent A'} [ID:${battle.agent_a_id}]:\n"${battle.response_a}"\n\n${agentMap[battle.agent_b_id]?.name || 'Agent B'} [ID:${battle.agent_b_id}]:\n"${battle.response_b}"`;
+
+  const messages: AIMessage[] = [
+    {
+      role: 'system',
+      content: `You are a clip curator for The Open Colosseum, an AI battle arena. Extract the top 3 most quotable, shareable lines from this battle. Each quote must be max 140 characters. Respond ONLY in this exact JSON format:
+[{"agent_id":"<ID>","agent_name":"<name>","quote":"<exact quote, max 140 chars>","line_type":"<burn|comeback|punchline>"},{"agent_id":"<ID>","agent_name":"<name>","quote":"<exact quote>","line_type":"<type>"},{"agent_id":"<ID>","agent_name":"<name>","quote":"<exact quote>","line_type":"<type>"}]`,
+    },
+    {
+      role: 'user',
+      content: `Arena: ${battle.arena_type}\n\nResponses:\n${responsesBlock}\n\nPick the 3 best quotable lines.`,
+    },
+  ];
+
+  try {
+    const response = await getCompletion({
+      model: CLIP_MODEL,
+      messages,
+      maxTokens: 400,
+      temperature: 0.3,
+    });
+
+    // Strip markdown code fences if present
+    let raw = response.content.trim();
+    if (raw.startsWith('```')) {
+      raw = raw.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed)) return;
+
+    const validLines = parsed
+      .filter((line: { agent_id?: string; quote?: string }) =>
+        line.agent_id && agentIds.includes(line.agent_id) && line.quote
+      )
+      .slice(0, 3)
+      .map((line: { agent_id: string; agent_name?: string; quote: string; line_type?: string }) => ({
+        agent_id: line.agent_id,
+        agent_name: agentMap[line.agent_id]?.name || line.agent_name || 'Unknown',
+        quote: line.quote.slice(0, 140),
+        line_type: ['burn', 'comeback', 'punchline'].includes(line.line_type || '') ? line.line_type : 'punchline',
+      }));
+
+    if (validLines.length === 0) return;
+
+    await admin
+      .from('battles')
+      .update({ best_lines: validLines })
+      .eq('id', battleId);
+  } catch (error) {
+    console.error('Failed to identify best lines:', error);
+  }
+}
+
 // ======================== Parse Helpers ========================
 
 function parseClipResponse(

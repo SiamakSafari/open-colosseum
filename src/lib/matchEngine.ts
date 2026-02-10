@@ -687,6 +687,21 @@ export async function startUndergroundBattle(
     // Resolve linked Molon Labe challenge (fire-and-forget)
     resolveChallengeByBattle(battle.id, winnerId).catch(err => console.error('Challenge resolution failed:', err));
 
+    // Phase L: Settle predictions (fire-and-forget)
+    import('@/lib/predictions').then(m => m.settlePredictions(battle.id, null, winnerId)).catch(err => console.error('Prediction settlement failed:', err));
+
+    // Phase L: Update rivalry (fire-and-forget)
+    import('@/lib/rivalries').then(m => m.updateRivalry(agentAId, agentBId, winnerId)).catch(err => console.error('Rivalry update failed:', err));
+
+    // Phase L: Update storylines for both agents (fire-and-forget)
+    import('@/lib/storylines').then(m => { m.updateAgentStoryline(agentAId).catch(() => {}); m.updateAgentStoryline(agentBId).catch(() => {}); }).catch(err => console.error('Storyline update failed:', err));
+
+    // Phase L: Check title challenge (fire-and-forget)
+    import('@/lib/titles').then(m => m.checkTitleChallenge(battle.id, null, winnerId, winnerId === agentAId ? agentBId : agentAId, 'roast')).catch(err => console.error('Title check failed:', err));
+
+    // Phase L: Identify best lines (fire-and-forget)
+    import('@/lib/clips').then(m => m.identifyBestLines(battle.id)).catch(err => console.error('Best lines failed:', err));
+
     return completed as DbBattle;
   } catch (error) {
     await admin
@@ -965,6 +980,26 @@ export async function settleBattle(battleId: string): Promise<MatchResult> {
 
   // Resolve linked Molon Labe challenge if this was a challenge battle (fire-and-forget)
   resolveChallengeByBattle(battleId, winnerId).catch(err => console.error('Challenge resolution failed:', err));
+
+  // Phase L: Settle predictions (fire-and-forget)
+  import('@/lib/predictions').then(m => m.settlePredictions(battleId, null, winnerId)).catch(err => console.error('Prediction settlement failed:', err));
+
+  // Phase L: Update rivalry (fire-and-forget)
+  import('@/lib/rivalries').then(m => m.updateRivalry(battle.agent_a_id, battle.agent_b_id, winnerId)).catch(err => console.error('Rivalry update failed:', err));
+
+  // Phase L: Update storylines for all participating agents (fire-and-forget)
+  import('@/lib/storylines').then(m => {
+    m.updateAgentStoryline(battle.agent_a_id).catch(() => {});
+    m.updateAgentStoryline(battle.agent_b_id).catch(() => {});
+    if (isDebate && battle.agent_c_id) m.updateAgentStoryline(battle.agent_c_id).catch(() => {});
+  }).catch(err => console.error('Storyline update failed:', err));
+
+  // Phase L: Check title challenge (fire-and-forget)
+  const loserId = winnerId === battle.agent_a_id ? battle.agent_b_id : battle.agent_a_id;
+  import('@/lib/titles').then(m => m.checkTitleChallenge(battleId, null, winnerId, loserId, battle.arena_type)).catch(err => console.error('Title check failed:', err));
+
+  // Phase L: Identify best lines (fire-and-forget)
+  import('@/lib/clips').then(m => m.identifyBestLines(battleId)).catch(err => console.error('Best lines failed:', err));
 
   return {
     winnerId,

@@ -249,3 +249,88 @@ export async function postUpset(
     { elo_difference: eloDiff, winner_elo: winnerElo, loser_elo: loserElo }
   );
 }
+
+// ======================== Phase L: Spectator Events ========================
+
+export async function postRivalryDeclared(
+  rivalryId: string,
+  agentAName: string,
+  agentBName: string,
+  totalFights: number
+): Promise<void> {
+  await postActivity(
+    'rivalry_declared',
+    'system',
+    null,
+    'agent',
+    rivalryId,
+    `RIVALRY DECLARED! ${agentAName} vs ${agentBName} — ${totalFights} fights and counting!`,
+    { agent_a: agentAName, agent_b: agentBName, total_fights: totalFights }
+  );
+}
+
+export async function postTitleClaimed(
+  titleName: string,
+  agentId: string,
+  agentName: string
+): Promise<void> {
+  await postActivity(
+    'title_claimed',
+    'agent',
+    agentId,
+    'agent',
+    agentId,
+    `${agentName} claims the ${titleName} title!`,
+    { title: titleName }
+  );
+}
+
+export async function postTitleDefended(
+  titleName: string,
+  agentId: string,
+  agentName: string,
+  defenses: number
+): Promise<void> {
+  await postActivity(
+    'title_defended',
+    'agent',
+    agentId,
+    'agent',
+    agentId,
+    `${agentName} defends the ${titleName} title! (${defenses} defenses)`,
+    { title: titleName, defenses }
+  );
+}
+
+export async function postTitleLost(
+  titleName: string,
+  loserId: string,
+  loserName: string,
+  winnerId: string,
+  winnerName: string
+): Promise<void> {
+  await postActivity(
+    'title_lost',
+    'agent',
+    winnerId,
+    'agent',
+    loserId,
+    `${winnerName} dethrones ${loserName} as ${titleName}!`,
+    { title: titleName, new_holder: winnerName, former_holder: loserName }
+  );
+}
+
+export async function postPowerRankings(
+  topAgentName: string,
+  weekStart: string
+): Promise<void> {
+  await postActivity(
+    'power_rankings',
+    'system',
+    null,
+    null,
+    null,
+    `Weekly Power Rankings are out! ${topAgentName} leads the pack.`,
+    { week_start: weekStart }
+  );
+}

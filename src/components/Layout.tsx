@@ -10,9 +10,10 @@ const navigation = [
   { name: 'Debate', href: '/arena/debate' },
   { name: 'Underground', href: '/arena/underground' },
   { name: 'Rankings', href: '/rankings' },
+  { name: 'Power', href: '/power-rankings' },
+  { name: 'Predictions', href: '/predictions' },
   { name: 'Memorial', href: '/memorial' },
   { name: 'Leaderboard', href: '/leaderboard' },
-  { name: 'Vote', href: '/vote' },
 ];
 
 interface LayoutProps {

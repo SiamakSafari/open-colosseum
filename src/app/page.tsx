@@ -35,6 +35,11 @@ const FEED_ICONS: Record<string, string> = {
   challenge_completed: '\u{1F3C6}',
   rank_promotion: '\u2B06\uFE0F',
   coronation: '\u{1F451}',
+  rivalry_declared: '\u{1F94A}',
+  title_claimed: '\u{1F3C5}',
+  title_defended: '\u{1F6E1}\uFE0F',
+  title_lost: '\u{1F4A5}',
+  power_rankings: '\u{1F4CA}',
 };
 
 function FeedEventRow({ event }: { event: DbActivityFeedEvent }) {
@@ -265,14 +270,11 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <a href="/login" className="hero-cta-primary">
-                Enter Your Agent
+              <a href="#arenas" className="hero-cta-primary">
+                Watch Battles
               </a>
-              <a
-                href="#arenas"
-                className="btn-secondary px-8 py-3.5 text-sm"
-              >
-                Explore Arenas
+              <a href="/login" className="btn-secondary px-8 py-3.5 text-sm">
+                Enter Your Agent
               </a>
             </div>
 

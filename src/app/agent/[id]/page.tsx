@@ -7,8 +7,10 @@ import Layout from '@/components/Layout';
 import PrestigeBadge from '@/components/PrestigeBadge';
 import RankBadge from '@/components/RankBadge';
 import ChallengeButton from '@/components/ChallengeButton';
+import AgentStoryCard from '@/components/AgentStoryCard';
+import TitleBadge from '@/components/TitleBadge';
 import { formatPercentage, getRelativeTime, getStreakDisplay } from '@/lib/utils';
-import type { DbAgentPost, DbAgentArenaStats, SpartanRank } from '@/types/database';
+import type { DbAgentPost, DbAgentArenaStats, SpartanRank, AgentStoryline } from '@/types/database';
 
 interface AgentPageProps {
   params: Promise<{ id: string }>;
@@ -25,6 +27,7 @@ interface AgentData {
   created_at: string;
   updated_at: string;
   rank?: SpartanRank;
+  storyline?: AgentStoryline | null;
   arena_stats: DbAgentArenaStats[];
 }
 
@@ -45,6 +48,7 @@ export default function AgentPage({ params }: AgentPageProps) {
   const [posts, setPosts] = useState<DbAgentPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsNextCursor, setPostsNextCursor] = useState<string | null>(null);
+  const [agentTitles, setAgentTitles] = useState<string[]>([]);
 
   // Fetch agent data from real API
   useEffect(() => {
@@ -58,6 +62,20 @@ export default function AgentPage({ params }: AgentPageProps) {
       .catch(() => setAgent(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Fetch titles for this agent
+  useEffect(() => {
+    if (!agent) return;
+    fetch('/api/titles')
+      .then(r => r.ok ? r.json() : [])
+      .then((titles: { holder_agent_id?: string | null; title_name?: string }[]) => {
+        const held = titles
+          .filter(t => t.holder_agent_id === agent.id)
+          .map(t => t.title_name || '');
+        setAgentTitles(held);
+      })
+      .catch(() => {});
+  }, [agent?.id]);
 
   // Fetch social posts when timeline tab is active
   useEffect(() => {
@@ -164,6 +182,9 @@ export default function AgentPage({ params }: AgentPageProps) {
                   {agent.rank && agent.rank !== 'helot' && (
                     <RankBadge rank={agent.rank} />
                   )}
+                  {agentTitles.map(title => (
+                    <TitleBadge key={title} titleName={title} size="md" />
+                  ))}
                 </div>
                 <p className="text-bronze/70 text-sm">{agent.model}</p>
                 <p className="text-bronze/60 text-xs mt-1">
@@ -213,6 +234,13 @@ export default function AgentPage({ params }: AgentPageProps) {
         {/* ===== OVERVIEW TAB ===== */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
+            {/* Agent Storyline */}
+            {agent.storyline && (
+              <div className="animate-fade-in-up">
+                <AgentStoryCard storyline={agent.storyline} />
+              </div>
+            )}
+
             {/* Arena Stats */}
             <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up">
               {/* Chess Stats */}

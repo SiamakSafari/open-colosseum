@@ -172,6 +172,8 @@ export interface Battle {
   blood_multiplier?: number;
   // Scheduled battles
   scheduled_for?: string | null;
+  // Phase L: Best lines
+  best_lines?: BestLine[] | null;
 }
 
 export interface BattleVote {
@@ -256,6 +258,7 @@ export interface DbAgent {
   rank: SpartanRank;
   rank_updated_at: string;
   unique_opponents_defeated: number;
+  storyline: AgentStoryline | null;
   created_at: string;
   updated_at: string;
 }
@@ -349,6 +352,8 @@ export interface DbBattle {
   blood_multiplier: number | null;
   // Scheduled battles
   scheduled_for: string | null;
+  // Phase L: Best lines
+  best_lines: BestLine[] | null;
 }
 
 // 6. votes
@@ -553,7 +558,12 @@ export type ActivityEventType =
   | 'rank_promotion'
   | 'coronation'
   | 'callout_issued'
-  | 'callout_accepted';
+  | 'callout_accepted'
+  | 'rivalry_declared'
+  | 'title_claimed'
+  | 'title_defended'
+  | 'title_lost'
+  | 'power_rankings';
 
 export interface DbActivityFeedEvent {
   id: string;
@@ -676,4 +686,113 @@ export interface CalloutWithAgents extends DbCallout {
 export interface ProfileWithWallet extends DbProfile {
   blood_balance: number;
   blood_locked: number;
+}
+
+// ============================================================
+// Phase L: Spectator Revolution Types
+// ============================================================
+
+// 24. predictions
+export interface DbPrediction {
+  id: string;
+  battle_id: string | null;
+  match_id: string | null;
+  user_id: string;
+  predicted_winner_id: string;
+  is_correct: boolean | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+// 25. prediction_stats
+export type PredictionTitle = 'Oracle Eye' | 'Fortune Teller' | 'Crystal Ball' | 'Novice Seer';
+
+export interface DbPredictionStats {
+  user_id: string;
+  total_predictions: number;
+  correct_predictions: number;
+  current_streak: number;
+  best_streak: number;
+  accuracy: number;
+  title: PredictionTitle | null;
+  updated_at: string;
+}
+
+// Best Lines
+export interface BestLine {
+  agent_id: string;
+  agent_name: string;
+  quote: string;
+  line_type: 'burn' | 'comeback' | 'punchline';
+}
+
+// 26. rivalries
+export interface DbRivalry {
+  id: string;
+  agent_a_id: string;
+  agent_b_id: string;
+  total_fights: number;
+  agent_a_wins: number;
+  agent_b_wins: number;
+  draws: number;
+  is_declared_rivalry: boolean;
+  rivalry_narrative: string | null;
+  last_fight_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Agent Storylines
+export interface AgentStoryline {
+  summary: string;
+  biggest_upset: string | null;
+  signature_arena: string | null;
+  nemesis: string | null;
+  hunting_ground: string | null;
+  updated_at: string;
+}
+
+// 27. arena_titles
+export interface DbArenaTitle {
+  id: string;
+  title_name: string;
+  arena_type: string;
+  holder_agent_id: string | null;
+  holder_since: string | null;
+  defenses: number;
+  longest_reign_days: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 28. title_history
+export interface DbTitleHistory {
+  id: string;
+  title_id: string;
+  agent_id: string;
+  won_at: string;
+  lost_at: string | null;
+  defenses: number;
+  reign_days: number;
+  created_at: string;
+}
+
+// 29. power_rankings
+export interface PowerRankEntry {
+  agent_id: string;
+  agent_name: string;
+  model: string;
+  composite_elo: number;
+  previous_rank: number | null;
+  movement: number;
+  highlight: string | null;
+}
+
+export interface DbPowerRanking {
+  id: string;
+  week_start: string;
+  week_end: string;
+  rankings: PowerRankEntry[];
+  narrative: string | null;
+  created_at: string;
 }

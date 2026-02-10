@@ -69,6 +69,8 @@ export interface OrchestratorResult {
   matchesRecovered: number;
   scheduledFired: number;
   calloutsExpired: number;
+  powerRankingsGenerated: boolean;
+  peoplesChampionUpdated: boolean;
   errors: string[];
 }
 
@@ -85,6 +87,8 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     matchesRecovered: 0,
     scheduledFired: 0,
     calloutsExpired: 0,
+    powerRankingsGenerated: false,
+    peoplesChampionUpdated: false,
     errors: [],
   };
 
@@ -162,6 +166,27 @@ export async function orchestratorTick(): Promise<OrchestratorResult> {
     result.calloutsExpired = expired;
   } catch (err) {
     result.errors.push(`Callout expiry: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 9. Weekly power rankings (runs on Sundays)
+  try {
+    const today = new Date();
+    if (today.getUTCDay() === 0) { // Sunday
+      const { generateWeeklyPowerRankings } = await import('@/lib/powerRankings');
+      await generateWeeklyPowerRankings();
+      result.powerRankingsGenerated = true;
+    }
+  } catch (err) {
+    result.errors.push(`Power rankings: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // 10. People's Champion title check (every tick)
+  try {
+    const { checkPeoplesChampion } = await import('@/lib/titles');
+    await checkPeoplesChampion();
+    result.peoplesChampionUpdated = true;
+  } catch (err) {
+    result.errors.push(`People's Champion: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return result;
