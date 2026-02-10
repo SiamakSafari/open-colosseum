@@ -44,8 +44,17 @@ async function fetchBattleData(id: string) {
     };
   };
 
+  // Only extract the fields we need (avoid passing huge response strings to ImageResponse)
   return {
-    ...raw,
+    arena_type: raw.arena_type as string,
+    status: raw.status as string,
+    winner_id: raw.winner_id as string | undefined,
+    agent_a_id: raw.agent_a_id as string,
+    agent_b_id: raw.agent_b_id as string,
+    is_underground: raw.is_underground as boolean | undefined,
+    clip_moment: raw.clip_moment as { quote: string } | null,
+    response_a: raw.response_a ? String(raw.response_a).slice(0, 200) : undefined,
+    response_b: raw.response_b ? String(raw.response_b).slice(0, 200) : undefined,
     agent_a: buildAgent(raw.agent_a_id),
     agent_b: buildAgent(raw.agent_b_id),
   };
@@ -56,21 +65,16 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
 
   let battle: {
     arena_type: string;
-    prompt?: string;
     agent_a: { name: string; elo: number; model: string };
     agent_b: { name: string; elo: number; model: string };
     status: string;
     winner_id?: string;
     agent_a_id: string;
     agent_b_id: string;
-    votes_a: number;
-    votes_b: number;
-    total_votes: number;
     is_underground?: boolean;
     response_a?: string;
     response_b?: string;
-    clip_moment?: { quote: string };
-    post_match_summary?: string;
+    clip_moment?: { quote: string } | null;
   } | null = null;
 
   try {
@@ -195,19 +199,17 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
               flex: 1,
             }}
           >
-            {isCompleted && winnerIsA && (
-              <div style={{ fontSize: 36 }}>&#128081;</div>
-            )}
+            {isCompleted && winnerIsA ? (
+              <div style={{ fontSize: 36 }}>{"👑"}</div>
+            ) : null}
             <div
               style={{
                 fontSize: winnerIsA ? 38 : 32,
                 fontWeight: 900,
-                color: isCompleted && winnerIsA ? '#c4a265' : isCompleted && !winnerIsA ? 'rgba(212, 196, 168, 0.4)' : '#d4c4a8',
+                color: isCompleted && winnerIsA ? '#c4a265' : isCompleted ? 'rgba(212, 196, 168, 0.4)' : '#d4c4a8',
                 textAlign: 'center',
                 maxWidth: 320,
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
               }}
             >
               {battle.agent_a.name}
@@ -248,19 +250,17 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
               flex: 1,
             }}
           >
-            {isCompleted && winnerIsB && (
-              <div style={{ fontSize: 36 }}>&#128081;</div>
-            )}
+            {isCompleted && winnerIsB ? (
+              <div style={{ fontSize: 36 }}>{"👑"}</div>
+            ) : null}
             <div
               style={{
                 fontSize: winnerIsB ? 38 : 32,
                 fontWeight: 900,
-                color: isCompleted && winnerIsB ? '#c4a265' : isCompleted && !winnerIsB ? 'rgba(212, 196, 168, 0.4)' : '#d4c4a8',
+                color: isCompleted && winnerIsB ? '#c4a265' : isCompleted ? 'rgba(212, 196, 168, 0.4)' : '#d4c4a8',
                 textAlign: 'center',
                 maxWidth: 320,
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
               }}
             >
               {battle.agent_b.name}
@@ -272,7 +272,7 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
         </div>
 
         {/* Winner announcement + quote */}
-        {isCompleted && winnerName && (
+        {isCompleted && winnerName ? (
           <div
             style={{
               display: 'flex',
@@ -286,13 +286,12 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
                 fontSize: 14,
                 color: '#c4a265',
                 letterSpacing: '0.2em',
-                textTransform: 'uppercase',
                 marginBottom: 6,
               }}
             >
-              WINNER: {winnerName}
+              {`WINNER: ${winnerName}`}
             </div>
-            {winnerQuote && (
+            {winnerQuote ? (
               <div
                 style={{
                   fontSize: 16,
@@ -303,11 +302,11 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
                   lineHeight: 1.5,
                 }}
               >
-                &ldquo;{winnerQuote}&rdquo;
+                {`\u201C${winnerQuote}\u201D`}
               </div>
-            )}
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         {/* Bottom line + CTA */}
         <div
