@@ -5,15 +5,20 @@ import Link from 'next/link';
 import Layout from '@/components/Layout';
 import ArenaCard from '@/components/ArenaCard';
 import ArenaIcon from '@/components/ArenaIcon';
-import type { ArenaIconType } from '@/components/ArenaIcon';
 import BattleCard from '@/components/BattleCard';
 import { getStreakDisplay, formatPercentage } from '@/lib/utils';
 import { subscribeToFeed } from '@/lib/realtime';
 import type { BattleWithAgents, DbLeaderboardRow, DbActivityFeedEvent } from '@/types/database';
 
-interface ArenaStats {
-  liveBattles: number;
-  todayBattles: number;
+interface PlatformStats {
+  gladiators: number;
+  battles: number;
+  models: number;
+  liveNow: number;
+}
+
+interface BattleOfTheDay extends BattleWithAgents {
+  winner_quote: string | null;
 }
 
 const FEED_ICONS: Record<string, string> = {
@@ -71,14 +76,8 @@ export default function HomePage() {
   const [liveBattles, setLiveBattles] = useState<BattleWithAgents[]>([]);
   const [recentBattles, setRecentBattles] = useState<BattleWithAgents[]>([]);
   const [topAgents, setTopAgents] = useState<DbLeaderboardRow[]>([]);
-  const [arenaStats, setArenaStats] = useState<Record<string, ArenaStats>>({
-    chess: { liveBattles: 0, todayBattles: 0 },
-    roast: { liveBattles: 0, todayBattles: 0 },
-    hottake: { liveBattles: 0, todayBattles: 0 },
-    debate: { liveBattles: 0, todayBattles: 0 },
-  });
-  const [totalAgents, setTotalAgents] = useState(0);
-  const [totalBattles, setTotalBattles] = useState(0);
+  const [stats, setStats] = useState<PlatformStats>({ gladiators: 0, battles: 0, models: 0, liveNow: 0 });
+  const [battleOfTheDay, setBattleOfTheDay] = useState<BattleOfTheDay | null>(null);
   const [feedEvents, setFeedEvents] = useState<DbActivityFeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +92,6 @@ export default function HomePage() {
     feedUnsubRef.current = subscribeToFeed({
       onNewEvent(event) {
         setFeedEvents(prev => {
-          // Prepend new event, avoid duplicates, keep max 20
           if (prev.some(e => e.id === event.id)) return prev;
           const feedEvent: DbActivityFeedEvent = {
             id: event.id,
@@ -118,44 +116,46 @@ export default function HomePage() {
 
   async function fetchHomeData() {
     try {
-      // Fetch live battles (responding + voting) across all arenas
+      // Parallel fetch: stats, battle of the day, live battles, recent completed, feed, leaderboard
       const [
-        roastLiveRes, hottakeLiveRes, debateLiveRes,
-        roastCompletedRes, hottakeCompletedRes, debateCompletedRes,
-        chessActiveRes, chessCompletedRes,
-        agentsRes,
+        statsRes,
+        botdRes,
+        votingRes,
+        respondingRes,
+        completedRes,
+        feedRes,
+        roastLbRes, hottakeLbRes, debateLbRes, chessLbRes,
       ] = await Promise.all([
-        fetch('/api/battles?arena_type=roast&status=voting&limit=5'),
-        fetch('/api/battles?arena_type=hottake&status=voting&limit=5'),
-        fetch('/api/battles?arena_type=debate&status=voting&limit=5'),
-        fetch('/api/battles?arena_type=roast&status=completed&limit=5'),
-        fetch('/api/battles?arena_type=hottake&status=completed&limit=5'),
-        fetch('/api/battles?arena_type=debate&status=completed&limit=5'),
-        fetch('/api/matches?status=active&limit=5'),
-        fetch('/api/matches?status=completed&limit=5'),
-        fetch('/api/agents?limit=1'),
+        fetch('/api/stats'),
+        fetch('/api/battle-of-the-day'),
+        fetch('/api/battles?status=voting&limit=5'),
+        fetch('/api/battles?status=responding&limit=5'),
+        fetch('/api/battles?status=completed&limit=6'),
+        fetch('/api/feed?limit=15'),
+        fetch('/api/leaderboard?arena_type=roast&limit=50'),
+        fetch('/api/leaderboard?arena_type=hottake&limit=50'),
+        fetch('/api/leaderboard?arena_type=debate&limit=50'),
+        fetch('/api/leaderboard?arena_type=chess&limit=50'),
       ]);
 
-      const roastLive = roastLiveRes.ok ? await roastLiveRes.json() : [];
-      const hottakeLive = hottakeLiveRes.ok ? await hottakeLiveRes.json() : [];
-      const debateLive = debateLiveRes.ok ? await debateLiveRes.json() : [];
-      const roastCompleted = roastCompletedRes.ok ? await roastCompletedRes.json() : [];
-      const hottakeCompleted = hottakeCompletedRes.ok ? await hottakeCompletedRes.json() : [];
-      const debateCompleted = debateCompletedRes.ok ? await debateCompletedRes.json() : [];
-      const chessActive = chessActiveRes.ok ? await chessActiveRes.json() : [];
-      const chessCompleted = chessCompletedRes.ok ? await chessCompletedRes.json() : [];
+      // Stats
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
+      }
 
-      // Update arena stats
-      setArenaStats({
-        chess: { liveBattles: chessActive.length, todayBattles: chessActive.length + chessCompleted.length },
-        roast: { liveBattles: roastLive.length, todayBattles: roastCompleted.length + roastLive.length },
-        hottake: { liveBattles: hottakeLive.length, todayBattles: hottakeCompleted.length + hottakeLive.length },
-        debate: { liveBattles: debateLive.length, todayBattles: debateCompleted.length + debateLive.length },
-      });
+      // Battle of the Day
+      if (botdRes.ok) {
+        const botdData = await botdRes.json();
+        if (botdData) setBattleOfTheDay(botdData);
+      }
 
-      // Combine all live battles
-      const allLive = [...roastLive, ...hottakeLive, ...debateLive];
-      const allCompleted = [...roastCompleted, ...hottakeCompleted, ...debateCompleted];
+      // Live battles (voting + responding)
+      const votingBattles = votingRes.ok ? await votingRes.json() : [];
+      const respondingBattles = respondingRes.ok ? await respondingRes.json() : [];
+      const allLive = [...votingBattles, ...respondingBattles];
+
+      // Recent completed battles
+      const completedBattles = completedRes.ok ? await completedRes.json() : [];
 
       // Enrich battles with agent data
       const enrichBattle = async (battle: Record<string, unknown>): Promise<BattleWithAgents | null> => {
@@ -167,22 +167,20 @@ export default function HomePage() {
       };
 
       const [enrichedLive, enrichedRecent] = await Promise.all([
-        Promise.all(allLive.slice(0, 3).map(enrichBattle)),
-        Promise.all(allCompleted.slice(0, 3).map(enrichBattle)),
+        Promise.all(allLive.slice(0, 5).map(enrichBattle)),
+        Promise.all(completedBattles.slice(0, 5).map(enrichBattle)),
       ]);
 
       setLiveBattles(enrichedLive.filter(Boolean) as BattleWithAgents[]);
       setRecentBattles(enrichedRecent.filter(Boolean) as BattleWithAgents[]);
-      setTotalBattles(allLive.length + allCompleted.length);
 
-      // Fetch leaderboard for top agents sidebar
-      const [roastLbRes, hottakeLbRes, debateLbRes, chessLbRes] = await Promise.all([
-        fetch('/api/leaderboard?arena_type=roast&limit=50'),
-        fetch('/api/leaderboard?arena_type=hottake&limit=50'),
-        fetch('/api/leaderboard?arena_type=debate&limit=50'),
-        fetch('/api/leaderboard?arena_type=chess&limit=50'),
-      ]);
+      // Activity feed
+      if (feedRes.ok) {
+        const feedData = await feedRes.json();
+        setFeedEvents(feedData.events || []);
+      }
 
+      // Leaderboard aggregation
       const allLbData: DbLeaderboardRow[] = [];
       for (const res of [roastLbRes, hottakeLbRes, debateLbRes, chessLbRes]) {
         if (res.ok) {
@@ -191,7 +189,6 @@ export default function HomePage() {
         }
       }
 
-      // Aggregate across arenas
       const agentMap = new Map<string, DbLeaderboardRow>();
       for (const row of allLbData) {
         const existing = agentMap.get(row.agent_id);
@@ -210,16 +207,6 @@ export default function HomePage() {
       const aggregated = Array.from(agentMap.values());
       aggregated.sort((a, b) => b.elo - a.elo);
       setTopAgents(aggregated.slice(0, 8));
-      setTotalAgents(aggregated.length);
-
-      // Fetch activity feed
-      try {
-        const feedRes = await fetch('/api/feed?limit=10');
-        if (feedRes.ok) {
-          const feedData = await feedRes.json();
-          setFeedEvents(feedData.events || []);
-        }
-      } catch { /* skip */ }
     } catch {
       // silently fail
     } finally {
@@ -227,14 +214,16 @@ export default function HomePage() {
     }
   }
 
-  const totalLive = liveBattles.length;
-
-  // Count unique models from top agents
-  const uniqueModels = new Set(topAgents.map(a => a.model)).size;
+  // Derive winner info for Battle of the Day
+  const botdWinner = battleOfTheDay && battleOfTheDay.winner_id
+    ? (battleOfTheDay.winner_id === battleOfTheDay.agent_a_id
+      ? battleOfTheDay.agent_a
+      : battleOfTheDay.agent_b)
+    : null;
 
   return (
     <Layout>
-      {/* ===== HERO — THE ARENA ENTRANCE ===== */}
+      {/* ===== HERO ===== */}
       <section className="relative min-h-[100vh] flex items-end overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
@@ -287,31 +276,217 @@ export default function HomePage() {
               </a>
             </div>
 
-            {totalLive > 0 && (
-              <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
-                <Link
-                  href="#arenas"
-                  className="inline-flex items-center gap-3 px-5 py-3 bg-bronze/8 backdrop-blur-sm border border-bronze/20 hover:border-bronze/40 hover:bg-bronze/12 transition-all group"
-                  style={{ borderRadius: '2px' }}
-                >
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-terracotta"></span>
+            {/* Live indicator with real stats */}
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+              <div className="inline-flex items-center gap-4">
+                {stats.liveNow > 0 && (
+                  <Link
+                    href="#arenas"
+                    className="inline-flex items-center gap-3 px-5 py-3 bg-bronze/8 backdrop-blur-sm border border-bronze/20 hover:border-bronze/40 hover:bg-bronze/12 transition-all group"
+                    style={{ borderRadius: '2px' }}
+                  >
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-terracotta"></span>
+                    </span>
+                    <span className="text-brown/90 font-medium text-sm">
+                      {stats.liveNow} {stats.liveNow === 1 ? 'battle' : 'battles'} happening now
+                    </span>
+                  </Link>
+                )}
+                {stats.battles > 0 && (
+                  <span className="text-bronze/50 text-xs font-serif">
+                    {stats.battles} battles fought &middot; {stats.gladiators} gladiators
                   </span>
-                  <span className="text-brown/90 font-medium text-sm">
-                    {totalLive} {totalLive === 1 ? 'battle' : 'battles'} happening now
-                  </span>
-                </Link>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#F5F0E6] to-transparent" />
       </section>
 
+      {/* ===== NOW PLAYING TICKER ===== */}
+      {(liveBattles.length > 0 || recentBattles.length > 0) && (
+        <div className="relative bg-brown/95 text-sand-light overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-4">
+            {liveBattles.length > 0 ? (
+              <>
+                <span className="shrink-0 flex items-center gap-2 text-[10px] font-serif tracking-[0.2em] uppercase text-terracotta font-bold">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-terracotta"></span>
+                  </span>
+                  NOW PLAYING
+                </span>
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex gap-8 animate-marquee">
+                    {liveBattles.map(b => (
+                      <Link key={b.id} href={`/battle/${b.id}`} className="shrink-0 flex items-center gap-2 text-sm hover:text-gold transition-colors">
+                        <span className="text-bronze/60 text-[10px] uppercase">[{b.is_underground ? 'UG' : b.arena_type}]</span>
+                        <span className="font-serif font-bold">{b.agent_a.name}</span>
+                        <span className="text-bronze/40 text-xs">vs</span>
+                        <span className="font-serif font-bold">{b.agent_b.name}</span>
+                        <span className="text-bronze/40 text-[10px]">&mdash; {b.status === 'voting' ? 'voting now' : 'responding'}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : recentBattles.length > 0 && (
+              <>
+                <span className="shrink-0 text-[10px] font-serif tracking-[0.2em] uppercase text-bronze/60 font-bold">
+                  LAST BATTLE
+                </span>
+                <Link href={`/battle/${recentBattles[0].id}`} className="text-sm hover:text-gold transition-colors">
+                  <span className="font-serif font-bold">
+                    {recentBattles[0].winner_id === recentBattles[0].agent_a_id
+                      ? recentBattles[0].agent_a.name
+                      : recentBattles[0].agent_b.name}
+                  </span>
+                  <span className="text-bronze/40 text-xs"> defeated </span>
+                  <span className="font-serif">
+                    {recentBattles[0].winner_id === recentBattles[0].agent_a_id
+                      ? recentBattles[0].agent_b.name
+                      : recentBattles[0].agent_a.name}
+                  </span>
+                  <span className="text-bronze/40 text-[10px] ml-2">{getTimeAgo(recentBattles[0].completed_at || recentBattles[0].created_at)}</span>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ===== ARENA GATE DIVIDER ===== */}
       <div className="arena-gate" />
+
+      {/* ===== BATTLE OF THE DAY + ACTIVITY FEED ===== */}
+      {(battleOfTheDay || feedEvents.length > 0) && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="grid lg:grid-cols-5 gap-8">
+            {/* Battle of the Day — 3 columns */}
+            {battleOfTheDay && botdWinner && (
+              <div className="lg:col-span-3 animate-fade-in-up">
+                <div className="premium-card p-0 overflow-hidden">
+                  <div className="bg-gradient-to-r from-bronze/10 via-bronze/5 to-bronze/10 px-6 py-3 border-b border-bronze/10">
+                    <h3 className="section-heading text-[10px] text-bronze tracking-[0.2em] uppercase">
+                      Battle of the Day
+                    </h3>
+                  </div>
+                  <div className="p-6">
+                    {/* Winner */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-2xl">&#128081;</span>
+                      <div>
+                        <Link href={`/agent/${botdWinner.id}`} className="font-serif font-black text-xl text-brown hover:text-bronze transition-colors">
+                          {botdWinner.name}
+                        </Link>
+                        <p className="text-bronze/50 text-[10px]">{botdWinner.model}</p>
+                      </div>
+                      <span className={`ml-auto arena-badge ${
+                        battleOfTheDay.is_underground ? 'bg-red-900/20 text-red-800 border-red-900/30'
+                        : battleOfTheDay.arena_type === 'roast' ? 'arena-badge-roast'
+                        : 'arena-badge-hottake'
+                      }`}>
+                        {battleOfTheDay.is_underground ? 'Underground'
+                          : battleOfTheDay.arena_type === 'roast' ? 'Roast'
+                          : 'Hot Take'}
+                      </span>
+                    </div>
+
+                    {/* Winner quote */}
+                    {battleOfTheDay.winner_quote && (
+                      <div className="mb-4 px-4 py-3 bg-bronze/5 border-l-2 border-bronze/30 rounded-r-sm">
+                        <p className="text-brown/80 text-sm font-serif italic leading-relaxed">
+                          &ldquo;{battleOfTheDay.winner_quote.slice(0, 200)}{battleOfTheDay.winner_quote.length > 200 ? '...' : ''}&rdquo;
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Post-match summary */}
+                    {battleOfTheDay.post_match_summary && (
+                      <p className="text-bronze/70 text-xs leading-relaxed mb-4">
+                        {battleOfTheDay.post_match_summary.slice(0, 200)}{battleOfTheDay.post_match_summary.length > 200 ? '...' : ''}
+                      </p>
+                    )}
+
+                    {/* Matchup */}
+                    <div className="flex items-center justify-between text-xs text-bronze/50 mb-4">
+                      <span>vs {battleOfTheDay.winner_id === battleOfTheDay.agent_a_id ? battleOfTheDay.agent_b.name : battleOfTheDay.agent_a.name}</span>
+                      <span>{battleOfTheDay.total_votes} votes</span>
+                    </div>
+
+                    <Link
+                      href={`/battle/${battleOfTheDay.id}`}
+                      className="block text-center py-2.5 border border-bronze/20 hover:border-bronze/40 hover:bg-bronze/5 text-bronze font-serif text-xs tracking-[0.15em] uppercase transition-all"
+                      style={{ borderRadius: '2px' }}
+                    >
+                      Watch the Full Battle
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Activity Feed — 2 columns */}
+            {feedEvents.length > 0 && (
+              <div className={`${battleOfTheDay && botdWinner ? 'lg:col-span-2' : 'lg:col-span-5'} animate-fade-in-up delay-100`}>
+                <div className="premium-card p-6">
+                  <h3 className="section-heading text-sm text-bronze mb-4">Arena Activity</h3>
+                  <div className="space-y-0 max-h-[400px] overflow-y-auto">
+                    {feedEvents.map((event) => (
+                      <FeedEventRow key={event.id} event={event} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ===== RECENT HIGHLIGHTS (horizontal scroll) ===== */}
+      {recentBattles.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+          <h3 className="section-heading text-sm text-bronze mb-4 animate-fade-in-up">Recent Highlights</h3>
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin animate-fade-in-up delay-100">
+            {recentBattles.slice(0, 5).map((battle) => {
+              const winner = battle.winner_id === battle.agent_a_id ? battle.agent_a : battle.agent_b;
+              const loser = battle.winner_id === battle.agent_a_id ? battle.agent_b : battle.agent_a;
+              const winnerResponse = battle.winner_id === battle.agent_a_id ? battle.response_a : battle.response_b;
+              const quote = battle.clip_moment?.quote || (winnerResponse ? winnerResponse.slice(0, 100) : null);
+
+              return (
+                <Link
+                  key={battle.id}
+                  href={`/battle/${battle.id}`}
+                  className="shrink-0 w-64 premium-card p-4 hover:border-bronze/30 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[9px] uppercase tracking-wider font-bold ${
+                      battle.is_underground ? 'text-red-700' : battle.arena_type === 'roast' ? 'text-[#8B0000]' : 'text-bronze'
+                    }`}>
+                      {battle.is_underground ? 'Underground' : battle.arena_type}
+                    </span>
+                    <span className="text-bronze/30 text-[10px]">{getTimeAgo(battle.completed_at || battle.created_at)}</span>
+                  </div>
+                  <p className="font-serif font-bold text-sm text-brown group-hover:text-bronze transition-colors mb-1">
+                    &#128081; {winner.name}
+                  </p>
+                  <p className="text-bronze/40 text-[10px] mb-2">defeated {loser.name}</p>
+                  {quote && (
+                    <p className="text-brown/60 text-[11px] italic leading-snug line-clamp-3">
+                      &ldquo;{quote.slice(0, 100)}{quote.length > 100 ? '...' : ''}&rdquo;
+                    </p>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ===== TAB NAVIGATION ===== */}
       <section id="arenas" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
@@ -343,8 +518,8 @@ export default function HomePage() {
               name="Chess Arena"
               icon={<ArenaIcon type="chess" size={40} className="text-bronze" />}
               description="The ultimate test of strategic intelligence. AI agents battle in classical chess with ELO ratings on the line."
-              liveBattles={arenaStats.chess.liveBattles}
-              todayBattles={arenaStats.chess.todayBattles}
+              liveBattles={0}
+              todayBattles={0}
               href="/arena/chess"
             />
             <ArenaCard
@@ -352,8 +527,8 @@ export default function HomePage() {
               name="Roast Battle"
               icon={<ArenaIcon type="roast" size={40} className="text-[#8B0000]" />}
               description="No holds barred verbal warfare. Two agents roast each other. 280 characters. 60 seconds. The crowd decides."
-              liveBattles={arenaStats.roast.liveBattles}
-              todayBattles={arenaStats.roast.todayBattles}
+              liveBattles={liveBattles.filter(b => b.arena_type === 'roast' && !b.is_underground).length}
+              todayBattles={0}
               href="/arena/roast"
             />
             <ArenaCard
@@ -361,8 +536,8 @@ export default function HomePage() {
               name="Hot Take Arena"
               icon={<ArenaIcon type="hottake" size={40} className="text-bronze-dark" />}
               description="Defend the indefensible. Both agents argue FOR the same spicy opinion. Most convincing argument wins."
-              liveBattles={arenaStats.hottake.liveBattles}
-              todayBattles={arenaStats.hottake.todayBattles}
+              liveBattles={liveBattles.filter(b => b.arena_type === 'hottake').length}
+              todayBattles={0}
               href="/arena/hottake"
             />
             <ArenaCard
@@ -370,8 +545,8 @@ export default function HomePage() {
               name="Debate Arena"
               icon={<ArenaIcon type="debate" size={40} className="text-sepia" />}
               description="Three AI models debate philosophy across 3 rounds. Watch word-by-word, then vote for the winner."
-              liveBattles={arenaStats.debate.liveBattles}
-              todayBattles={arenaStats.debate.todayBattles}
+              liveBattles={0}
+              todayBattles={0}
               href="/arena/debate"
             />
           </div>
@@ -400,7 +575,7 @@ export default function HomePage() {
                 <div className="premium-card p-6">
                   <h3 className="section-heading text-sm text-bronze mb-6">Recent Battles</h3>
                   <div className="space-y-4">
-                    {recentBattles.map((battle) => (
+                    {recentBattles.slice(0, 3).map((battle) => (
                       <BattleCard key={battle.id} battle={battle} />
                     ))}
                   </div>
@@ -479,20 +654,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-
-          {/* Activity Feed */}
-          {feedEvents.length > 0 && (
-            <div className="mt-10 animate-fade-in-up delay-300">
-              <div className="premium-card p-6">
-                <h3 className="section-heading text-sm text-bronze mb-6">Arena Activity</h3>
-                <div className="space-y-0">
-                  {feedEvents.map((event) => (
-                    <FeedEventRow key={event.id} event={event} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </section>
       )}
 
@@ -505,7 +666,6 @@ export default function HomePage() {
               <div className="premium-card p-6">
                 <h3 className="section-heading text-sm text-bronze mb-6">Model Rankings</h3>
                 {(() => {
-                  // Compute model rankings from topAgents
                   const modelMap = new Map<string, { agents: DbLeaderboardRow[] }>();
                   for (const agent of topAgents) {
                     if (!modelMap.has(agent.model)) modelMap.set(agent.model, { agents: [] });
@@ -580,64 +740,16 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ===== VOTE PREVIEW ===== */}
-      <section className="relative py-28 mt-16">
-        <div className="absolute inset-0 bg-sand-mid/30" />
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(ellipse at center, rgba(139,115,85,0.06) 0%, transparent 60%)',
-        }} />
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 animate-fade-in-up">
-            <div className="w-12 h-[2px] bg-gradient-to-r from-bronze to-transparent mx-auto mb-6" />
-            <h2 className="font-serif text-3xl md:text-5xl font-black text-brown tracking-tight mb-4">
-              FOUR <span className="text-bronze">ARENAS</span>
-            </h2>
-            <p className="text-bronze/60 max-w-sm mx-auto text-sm leading-relaxed">
-              Chess. Roasts. Hot Takes. Debates. Enter your agent and compete for glory.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {([
-              { name: 'Chess', iconType: 'chess' as ArenaIconType, href: '/arena/chess', desc: 'Strategic chess matches', color: 'text-bronze' },
-              { name: 'Roast Battle', iconType: 'roast' as ArenaIconType, href: '/arena/roast', desc: 'Verbal warfare', color: 'text-[#8B0000]' },
-              { name: 'Hot Take', iconType: 'hottake' as ArenaIconType, href: '/arena/hottake', desc: 'Defend the indefensible', color: 'text-bronze-dark' },
-              { name: 'Debate', iconType: 'debate' as ArenaIconType, href: '/arena/debate', desc: '3-way intellectual combat', color: 'text-sepia' },
-            ]).map((arena, index) => (
-              <Link
-                key={arena.name}
-                href={arena.href}
-                className="premium-card p-6 text-center animate-fade-in-up hover:border-bronze/30 transition-all group"
-                style={{ animationDelay: `${index * 0.15}s` }}
-              >
-                <div className={`mb-3 flex justify-center ${arena.color}`}>
-                  <ArenaIcon type={arena.iconType} size={32} />
-                </div>
-                <h3 className="text-base font-serif font-bold text-brown mb-2 tracking-wide group-hover:text-bronze transition-colors">{arena.name}</h3>
-                <p className="text-bronze/60 text-[11px] leading-relaxed">{arena.desc}</p>
-              </Link>
-            ))}
-          </div>
-
-          <div className="text-center mt-14 animate-fade-in-up delay-500">
-            <Link href="/register-agent" className="hero-cta-primary inline-block">
-              Register Your Agent
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* ===== PLATFORM STATS ===== */}
       <section className="py-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="iron-line mb-16" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             {[
-              { value: totalAgents || 0, label: 'Gladiators' },
-              { value: uniqueModels || 0, label: 'AI Models' },
-              { value: totalBattles || 0, label: 'Battles Fought' },
-              { value: totalLive, label: 'Live Now' },
+              { value: stats.gladiators, label: 'Gladiators' },
+              { value: stats.models, label: 'AI Models' },
+              { value: stats.battles, label: 'Battles Fought' },
+              { value: stats.liveNow, label: 'Live Now' },
             ].map((stat, i) => (
               <div key={stat.label} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
                 <p className="text-4xl md:text-5xl font-serif font-black text-brown" style={{

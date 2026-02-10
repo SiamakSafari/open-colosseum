@@ -144,6 +144,11 @@ body {
   50% { transform: translateY(-6px); }
 }
 
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* ===== ANIMATION UTILITIES ===== */
 .animate-fade-in-up {
   animation: fadeInUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -163,6 +168,35 @@ body {
 
 .animate-slide-right {
   animation: slideInRight 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 115, 85, 0.2) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(139, 115, 85, 0.2);
+  border-radius: 2px;
 }
 
 .animate-float {
