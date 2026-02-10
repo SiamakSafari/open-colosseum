@@ -1,10 +1,55 @@
 import { ImageResponse } from 'next/og';
-import { getSupabaseAdmin } from '@/lib/supabase';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 export const alt = 'Battle Result — The Open Colosseum';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+
+// Query Supabase REST API directly (no supabase-js dependency for edge compat)
+async function fetchBattleData(id: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) return null;
+
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Fetch battle
+  const battleRes = await fetch(
+    `${supabaseUrl}/rest/v1/battles?id=eq.${id}&select=*&limit=1`,
+    { headers, cache: 'no-store' }
+  );
+  if (!battleRes.ok) return null;
+  const battles = await battleRes.json();
+  if (!battles.length) return null;
+  const raw = battles[0];
+
+  // Fetch agents
+  const agentIds = [raw.agent_a_id, raw.agent_b_id].filter(Boolean);
+  const agentsRes = await fetch(
+    `${supabaseUrl}/rest/v1/agents?id=in.(${agentIds.map((i: string) => `"${i}"`).join(',')})&select=id,name,model`,
+    { headers, cache: 'no-store' }
+  );
+  const agents = agentsRes.ok ? await agentsRes.json() : [];
+
+  const buildAgent = (agentId: string) => {
+    const agent = agents.find((a: { id: string }) => a.id === agentId);
+    return {
+      name: agent?.name || 'Unknown',
+      model: agent?.model || 'Unknown',
+      elo: 1200,
+    };
+  };
+
+  return {
+    ...raw,
+    agent_a: buildAgent(raw.agent_a_id),
+    agent_b: buildAgent(raw.agent_b_id),
+  };
+}
 
 export default async function BattleOGImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,42 +74,7 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
   } | null = null;
 
   try {
-    const admin = getSupabaseAdmin();
-    const { data: raw, error } = await admin
-      .from('battles')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (!error && raw) {
-      const agentIds = [raw.agent_a_id, raw.agent_b_id].filter(Boolean);
-      const { data: agents } = await admin
-        .from('agents')
-        .select('id, name, model')
-        .in('id', agentIds);
-
-      const { data: stats } = await admin
-        .from('agent_arena_stats')
-        .select('agent_id, elo')
-        .in('agent_id', agentIds)
-        .eq('arena_type', raw.arena_type);
-
-      const buildAgent = (agentId: string) => {
-        const agent = agents?.find((a: { id: string }) => a.id === agentId);
-        const stat = stats?.find((s: { agent_id: string }) => s.agent_id === agentId);
-        return {
-          name: agent?.name || 'Unknown',
-          model: agent?.model || 'Unknown',
-          elo: stat?.elo || 1200,
-        };
-      };
-
-      battle = {
-        ...raw,
-        agent_a: buildAgent(raw.agent_a_id),
-        agent_b: buildAgent(raw.agent_b_id),
-      };
-    }
+    battle = await fetchBattleData(id);
   } catch {
     // Fall through to fallback
   }
