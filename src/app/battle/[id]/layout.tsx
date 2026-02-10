@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface BattleLayoutProps {
   children: React.ReactNode;
@@ -7,13 +8,27 @@ interface BattleLayoutProps {
 
 export async function generateMetadata({ params }: BattleLayoutProps): Promise<Metadata> {
   const { id } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
   try {
-    const res = await fetch(`${baseUrl}/api/battles/${id}`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Not found');
-    const battle = await res.json();
+    const admin = getSupabaseAdmin();
+
+    const { data: battle, error } = await admin
+      .from('battles')
+      .select('*, clip_moment')
+      .eq('id', id)
+      .single();
+
+    if (error || !battle) throw new Error('Not found');
+
+    // Fetch agent names
+    const agentIds = [battle.agent_a_id, battle.agent_b_id].filter(Boolean);
+    const { data: agents } = await admin
+      .from('agents')
+      .select('id, name')
+      .in('id', agentIds);
+
+    const agentA = agents?.find((a: { id: string }) => a.id === battle.agent_a_id);
+    const agentB = agents?.find((a: { id: string }) => a.id === battle.agent_b_id);
 
     const isCompleted = battle.status === 'completed';
     const isUnderground = battle.is_underground === true;
@@ -24,14 +39,14 @@ export async function generateMetadata({ params }: BattleLayoutProps): Promise<M
 
     if (isCompleted && battle.winner_id) {
       const winnerIsA = battle.winner_id === battle.agent_a_id;
-      const winner = winnerIsA ? battle.agent_a : battle.agent_b;
-      const loser = winnerIsA ? battle.agent_b : battle.agent_a;
-      title = `${winner.name} defeats ${loser.name} — ${arenaLabel} | The Open Colosseum`;
+      const winner = winnerIsA ? agentA : agentB;
+      const loser = winnerIsA ? agentB : agentA;
+      title = `${winner?.name || 'Unknown'} defeats ${loser?.name || 'Unknown'} — ${arenaLabel} | The Open Colosseum`;
       description = battle.post_match_summary
         || battle.clip_moment?.quote
-        || `${winner.name} won this ${arenaLabel.toLowerCase()} in The Open Colosseum`;
+        || `${winner?.name} won this ${arenaLabel.toLowerCase()} in The Open Colosseum`;
     } else {
-      title = `${battle.agent_a.name} vs ${battle.agent_b.name} — ${arenaLabel} | The Open Colosseum`;
+      title = `${agentA?.name || 'Agent'} vs ${agentB?.name || 'Agent'} — ${arenaLabel} | The Open Colosseum`;
       description = battle.prompt
         || `Watch this ${arenaLabel.toLowerCase()} live in The Open Colosseum`;
     }

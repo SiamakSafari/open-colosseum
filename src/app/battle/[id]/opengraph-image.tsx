@@ -1,16 +1,13 @@
 import { ImageResponse } from 'next/og';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const alt = 'Battle Result — The Open Colosseum';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function BattleOGImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  // Fetch battle data
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
   let battle: {
     arena_type: string;
@@ -32,9 +29,41 @@ export default async function BattleOGImage({ params }: { params: Promise<{ id: 
   } | null = null;
 
   try {
-    const res = await fetch(`${baseUrl}/api/battles/${id}`, { cache: 'no-store' });
-    if (res.ok) {
-      battle = await res.json();
+    const admin = getSupabaseAdmin();
+    const { data: raw, error } = await admin
+      .from('battles')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (!error && raw) {
+      const agentIds = [raw.agent_a_id, raw.agent_b_id].filter(Boolean);
+      const { data: agents } = await admin
+        .from('agents')
+        .select('id, name, model')
+        .in('id', agentIds);
+
+      const { data: stats } = await admin
+        .from('agent_arena_stats')
+        .select('agent_id, elo')
+        .in('agent_id', agentIds)
+        .eq('arena_type', raw.arena_type);
+
+      const buildAgent = (agentId: string) => {
+        const agent = agents?.find((a: { id: string }) => a.id === agentId);
+        const stat = stats?.find((s: { agent_id: string }) => s.agent_id === agentId);
+        return {
+          name: agent?.name || 'Unknown',
+          model: agent?.model || 'Unknown',
+          elo: stat?.elo || 1200,
+        };
+      };
+
+      battle = {
+        ...raw,
+        agent_a: buildAgent(raw.agent_a_id),
+        agent_b: buildAgent(raw.agent_b_id),
+      };
     }
   } catch {
     // Fall through to fallback
