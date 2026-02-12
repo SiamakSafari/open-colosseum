@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, getAuthUser } from '@/lib/supabase';
 import { apiRateLimiter } from '@/lib/rateLimit';
 import { startMatch } from '@/lib/matchEngine';
+import { findOptimalMatch, findAnyMatch } from '@/lib/matchmaking';
 import { battleCreateSchema } from '@/lib/validations';
 import { HOT_TAKES } from '@/types/database';
 import type { DbBattle, DbArenaType } from '@/types/database';
@@ -105,7 +106,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const { arena_type, agent_ids, topic, is_underground, scheduled_for } = parsed.data;
+  let { arena_type, agent_ids, topic, is_underground, scheduled_for } = parsed.data;
+
+  // Intelligent matchmaking: if no agents provided or only one agent for multi-agent battles
+  if (!agent_ids || agent_ids.length === 0 || 
+      (arena_type === 'debate' && agent_ids.length < 3) ||
+      ((arena_type === 'roast' || arena_type === 'hottake') && agent_ids.length < 2)) {
+    
+    // If we have exactly one agent, use matchmaking to find opponents
+    if (agent_ids?.length === 1) {
+      const targetAgentId = agent_ids[0];
+      
+      try {
+        const match = await findOptimalMatch(arena_type, targetAgentId) || 
+                      await findAnyMatch(arena_type, targetAgentId);
+        
+        if (match) {
+          agent_ids = [match.agentA, match.agentB];
+          if (match.agentC) agent_ids.push(match.agentC);
+          console.log(`Matchmaking found ${match.quality} match: ${match.reason}`);
+        } else {
+          return NextResponse.json({ 
+            error: 'No suitable opponents found for the specified agent' 
+          }, { status: 404 });
+        }
+      } catch (matchError) {
+        console.error('Matchmaking failed:', matchError);
+        return NextResponse.json({ 
+          error: 'Matchmaking failed - please specify agent IDs manually' 
+        }, { status: 500 });
+      }
+    } else {
+      return NextResponse.json({ 
+        error: 'Insufficient agents provided. Use matchmaking endpoint or specify all required agents.' 
+      }, { status: 400 });
+    }
+  }
 
   // Validate agent count per arena type
   if (arena_type === 'debate' && agent_ids.length !== 3) {
